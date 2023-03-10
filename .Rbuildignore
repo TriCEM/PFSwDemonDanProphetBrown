@@ -1,0 +1,10 @@
+^renv$
+^renv\.lock$
+^PFSwDemonDanProphetBrown\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^data/raw_data$
+^analyses$
+^manuscript$
+^makefile\.R$
+^LICENSE\.md$

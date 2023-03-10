@@ -1,21 +1,23 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
+# Identifying Contact Network Features that Complicate Epidemic Final Size Prediction Research Compendium
+
+This repository is a working [R-Research
+Copmendium](https://github.com/ropensci/rrrpkg) for the manuscript
+\*\*\*\*. **<description of findings and results>**
+
 [![minimal R
 version](https://img.shields.io/badge/R%3E%3D-4.2.2-brightgreen.svg)](https://cran.r-project.org/)
 [![Licence](https://img.shields.io/github/license/mashape/apistatus.svg)](http://choosealicense.com/licenses/mit/)
-\## Research Compendium for *Identifying Contact Network Features that
-Complicate Epidemic Final Size Prediction*.
-**<description of findings and results>**
 
 ### Downloading and Reproducing
 
-This repository is a working [R-Research
-Copmendium](https://github.com/ropensci/rrrpkg) based on the structure
-of Ben Warrick’s [`rrtools`](https://github.com/benmarwick/rrtools) and
-Carl Boettig’s [template](https://github.com/cboettig/template)
-packages. To recreate the analyses are results, initialize the package
-with the following commands:
+*N.B.* Structure based on Ben Warrick’s
+[`rrtools`](https://github.com/benmarwick/rrtools) and Carl Boettig’s
+[template](https://github.com/cboettig/template) packages. To recreate
+the analyses are results, initialize the package with the following
+commands:
 
     git clone https://https://github.com/TriCEM/PFSwDemonDanProphetBrown.git
     cd PFSwDemonDanProphetBrown.git

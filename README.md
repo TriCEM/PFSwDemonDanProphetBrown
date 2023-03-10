@@ -3,13 +3,16 @@
 
 # Identifying Contact Network Features that Complicate Epidemic Final Size Prediction Research Compendium
 
-This repository is a working [R-Research
-Copmendium](https://github.com/ropensci/rrrpkg) for the manuscript
-\*\*\*\*. **<description of findings and results>**
+<!-- Badge Start -->
 
 [![minimal R
 version](https://img.shields.io/badge/R%3E%3D-4.2.2-brightgreen.svg)](https://cran.r-project.org/)
 [![Licence](https://img.shields.io/github/license/mashape/apistatus.svg)](http://choosealicense.com/licenses/mit/)
+<!-- Badge End -->
+
+This repository is a working [R-Research
+Copmendium](https://github.com/ropensci/rrrpkg) for the manuscript
+\*\*\*\*. **<description of findings and results>**
 
 ### Downloading and Reproducing
 
@@ -60,7 +63,7 @@ repository and may be updated after manuscript resutls are released.
 ### Licenses
 
 Code: [MIT](http://opensource.org/licenses/MIT) year: 2023, copyright
-holder: OJ Watson
+holder: Nicholas F. Brazeau
 
 Data: [CC-0](http://creativecommons.org/publicdomain/zero/1.0/)
 attribution requested in reuse

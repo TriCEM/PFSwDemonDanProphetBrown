@@ -10,4 +10,12 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.1
 Imports: 
-    magrittr
+    magrittr,
+    tibble,
+    tidyr,
+    stats,
+    remotes,
+    goodegg,
+    igraph
+Remotes:
+    nickbrazeau/goodegg,

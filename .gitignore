@@ -1,1 +1,31 @@
-.Rproj.user
+# History files
+.Rhistory
+.Rapp.history
+
+# RStudio files
+.Rproj.user/
+
+# Session Data files
+.RData
+
+# Data files priv/too large
+raw_data/
+sandbox/
+ignore/
+
+# knitr and R markdown default cache directories
+/*_cache/
+/cache/
+*png
+
+# Temporary files created by R markdown
+*.utf8.md
+*.knit.md
+
+# knitr outputs
+*.pdf
+*.html
+*.docx
+
+# MAC files
+.DS_Store

@@ -13,9 +13,13 @@ Imports:
     magrittr,
     tibble,
     tidyr,
+    purrr,
     stats,
     remotes,
     goodegg,
-    igraph
+    igraph,
+    targets,
+    tarchetypes,
+    truncnorm
 Remotes:
     nickbrazeau/goodegg,

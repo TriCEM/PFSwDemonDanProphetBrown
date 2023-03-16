@@ -9,7 +9,6 @@
 .RData
 
 # Data files priv/too large
-raw_data/
 sandbox/
 ignore/
 

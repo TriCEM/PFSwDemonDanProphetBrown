@@ -1,5 +1,64 @@
-#' @title Identify Potential Edges to Create Triangles in Network
+#' @title Use Random Search to Manipulate the Degree Distribution of a Network
 #' @param graph_network input graph (class igraph)
+#' @param degprob numeric; edge density probability per node
+#' @description
+#' @details
+#' @importFrom truncnorm rtruncnorm
+#' @importFrom igraph
+#' @returns
+
+manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
+                          searches = 1e3) {
+  #......................
+  # checks
+  #......................
+  goodegg::assert_eq("igraph", class(graph_network),
+                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+
+
+  #......................
+  # setup (const, storage, etc)
+  #......................
+  # new degree sequence based on mean and variance
+  nodecount <- vcount(graph_network)
+  new_edge_density <- sapply(1:nodecount, function(x, m, v){
+    out <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = m, sd = sqrt(v))
+    return(out)
+  }, m = degprob, v = degvar)
+  new_edge_density <- round( new_edge_density * nodecount )
+  # generate random numbers for search
+  rands <- sample(1:.Machine$integer.max, size = searches, replace = F)
+
+
+  #......................
+  # core
+  #......................
+  # identify new potential graphs
+  # cost is based on edges that are shared
+  sapply(rands, function(seednum, new_edge_density, graph_network){
+    seed(seednum)
+    new_graph_network <- igraph::degree.sequence.game(out.deg = new_edge_density,
+                                                      method = "vl")
+    overlaps <- igraph::graph.intersection(graph_network, new_graph_network)
+
+    # out
+    out <- tibble(randnum = seednum, overlaps = overlaps)
+    return(out)
+  }, new_edge_density = new_edge_density, graph_network = graph_network)
+
+
+  #......................
+  # out
+  #......................
+  return()
+}
+
+
+
+
+
+#' @title Identify Potential Edges to Create Triangles in Network
+#' @inheritParams manip_degdist
 #' @description Identifies potential edges that would create triangles from
 #' the input network. Returns those edges as an A(i,j) listing, where A is the adjacency
 #' matrix

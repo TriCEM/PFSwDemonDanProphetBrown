@@ -66,6 +66,11 @@ plot(gnet_del,
      vertex.label.dist = 3,
      vertex.label.font = 2)
 
+# subset edges
+# TODO
+
+
+
 
 #............................................................
 # identifying paths with the most betweeness or connectedness

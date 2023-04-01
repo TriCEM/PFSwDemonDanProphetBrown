@@ -23,19 +23,6 @@ mk_base_nets_sout <- function(nm, n, p.or.m, type, outdir) {
 }
 
 
-#' @title Wrapper for `manip_degdist`
-#' @noMd
-#' @return Number of overlaps (integer)
-manip_degdist_wrapper <- function(basenetpath, degprob, degvar, searches) {
-  grphnet <- readRDS(basenetpath)
-  out <- manip_degdist(graph_network = grphnet,
-                       degprob = degprob,
-                       degvar = degvar,
-                       searches = searches)
-  out <- out$best_overlapping_graph
-  return(out)
-}
-
 #' @title Use Random Search to Manipulate the Degree Distribution of a Network
 #' @param graph_network input graph (class igraph)
 #' @param degprob numeric; edge density probability per node
@@ -120,6 +107,19 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0, searches = 1
   return(out)
 }
 
+#' @title Wrapper for `manip_degdist`
+#' @noMd
+#' @return igraph network
+wrapper_manip_degdist <- function(basenetpath, degprob, degvar, searches) {
+  grphnet <- readRDS(basenetpath)
+  out <- manip_degdist(graph_network = grphnet,
+                       degprob = degprob,
+                       degvar = degvar,
+                       searches = searches)
+  out <- out$best_overlapping_graph
+  return(out)
+}
+
 
 
 #' @title Increase Network Modularity by Removing Connected Edges
@@ -129,7 +129,7 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0, searches = 1
 #' edges are removed. Edge connectedness is determined by the \code{igraph::edge_betweenness}
 #' function. The process is deterministic with the most connected edges being removed
 #' sequentially
-#' @returns networks graph (class igraph)
+#' @returns network graph (class igraph) with new modularity
 
 manip_modular_rmedges <- function(graph_network, edge_rm_num) {
   #......................
@@ -158,6 +158,16 @@ manip_modular_rmedges <- function(graph_network, edge_rm_num) {
 
 
 
+#' @title Wrapper for `manip_modular_rmedges`
+#' @noMd
+#' @return igraph network
+wrapper_manip_modular_rmedges <- function(basenetpath, edge_rm_num) {
+  grphnet <- readRDS(basenetpath)
+  out <- manip_modular_rmedges(graph_network = grphnet,
+                               edge_rm_num = edge_rm_num)
+  return(out)
+}
+
 
 
 #' @title Identify Potential Edges to Create Triangles (Clustering) in Network
@@ -182,7 +192,7 @@ get_potential_triangle_edges <- function(graph_network) {
   # storage
   newtri_conns <- list()
   # squared adjacency matrix gives all paths of 2 (Gilbert Strang, pg 78)
-  gnet_adjmat <- igraph::as_adjacency_matrix(gnet, sparse = F)
+  gnet_adjmat <- igraph::as_adjacency_matrix(graph_network, sparse = F)
   gnet_adjmatsq <- gnet_adjmat %*% gnet_adjmat
   # drop out elements we don't need to avoid redundancies (matrix is symmetric)
   diag(gnet_adjmatsq) <- 0
@@ -216,4 +226,58 @@ get_potential_triangle_edges <- function(graph_network) {
   # out
   #......................
   return(newtri_conns)
+}
+
+
+#' @title Add New Edges to Induce Clustering (Triangles)
+#' @inheritParams manip_degdist
+#' @param edge_add_num int; Number of edges to add
+#' @description Identify a subset of dyad pairs that could have a new edge
+#' introduced between them to induce a cluster, or new triangle.
+#' @details Adds edges sequentially based on node numbering
+#' @importFrom PFSwDemonDanProphetBrown get_potential_triangle_edges
+#' @returns network graph (igraph class) with new triangle clusters
+
+manip_clust_addedges <- function(graph_network, edge_add_num) {
+  #......................
+  # checks
+  #......................
+  goodegg::assert_eq("igraph", class(graph_network),
+                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+  goodegg::assert_single_int(edge_add_num)
+
+  #......................
+  # setup (const, storage, etc)
+  #......................
+  new_graph_network <- graph_network
+  #......................
+  # core
+  #......................
+  potedges <- get_potential_triangle_edges(graph_network)
+  # catch
+  if (length(potedges) > edge_add_num) {
+    stop("You have requested to add more edges than there are potential dyad pairs.
+         Either submit a new graph network or decrease the number of requested
+         edges")
+  }
+  # add edges in place
+  for (i in 1:edge_add_num) {
+    new_graph_network <- igraph::add_edges(graph = new_graph_network,
+                                           edges = potedges[[i]])
+  }
+
+  #......................
+  # out
+  #......................
+  return(new_graph_network)
+}
+
+#' @title Wrapper for `manip_clust_addedges`
+#' @noMd
+#' @return igraph network
+wrapper_manip_clust_addedges <- function(basenetpath, edge_add_num) {
+  grphnet <- readRDS(basenetpath)
+  out <- manip_clust_addedges(graph_network = grphnet,
+                              edge_add_num = edge_add_num)
+  return(out)
 }

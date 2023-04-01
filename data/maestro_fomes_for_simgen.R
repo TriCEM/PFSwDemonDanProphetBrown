@@ -65,14 +65,14 @@ maestro_dfbase <- tibble::tibble(
 #++++++++++++++++++++++++++++++++++++++++++
 #### Degree Distribution        ####
 #++++++++++++++++++++++++++++++++++++++++++
-# expand out grid for degree distributions for homogenous
+# expand out grid for degree distributions for homogenous variance
 degprobdist <- seq(0.1, 1, length.out = 10)
 dfdegdist_homogen <- expand.grid(basenetpaths, degprobdist,
                                  stringsAsFactors = F) %>%
   magrittr::set_colnames(c("basenetpath", "degprob")) %>%
   dplyr::mutate(degvar = 0)
 
-# expand out grid for degree distributions for heterogenous
+# expand out grid for degree distributions for heterogenous variance
 degvardist <- c(0.5, 1, 5, 10, 25)
 dfdegdist_hetero <- expand.grid(basenetpaths, degprobdist, degvardist,
                                 stringsAsFactors = F) %>%
@@ -89,14 +89,13 @@ dfdegdist <- dplyr::bind_rows(dfdegdist_homogen, dfdegdist_hetero) %>%
 # run manipulations via search using wrapper for mem optim
 dfdegdist <- dfdegdist %>%
   dplyr::mutate(new_network = purrr::pmap(.,
-                                          manip_degdist_wrapper))
-
-
+                                          wrapper_manip_degdist))
 
 #......................
 # write these out
 #......................
 outdir <- "data/raw_data/degreedist_networks/"
+dir.create(outdir, recursive = T)
 maestro_dfdegdist <- dfdegdist %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
@@ -124,18 +123,111 @@ maestro_dfdegdist <- maestro_dfdegdist %>%
 #++++++++++++++++++++++++++++++++++++++++++
 #### Modularity       ####
 #++++++++++++++++++++++++++++++++++++++++++
+# expand out grid for edges to remove to make modular communities
+edgedrop <- c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000)
+dfmodularity <- expand.grid(basenetpaths, edgedrop,
+                            stringsAsFactors = F) %>%
+  magrittr::set_colnames(c("basenetpath", "edge_rm_num"))
+
+
+#......................
+# perform manipulations
+#......................
+dfmodularity <- dfmodularity %>%
+  dplyr::mutate(new_network = purrr::pmap(.,
+                                          wrapper_manip_modular_rmedges))
+
+#......................
+# write these out
+#......................
+outdir <- "data/raw_data/modularity_networks/"
+dir.create(outdir, recursive = T)
+maestro_dfmodularity <- dfmodularity %>%
+  dplyr::rename(val = edge_rm_num) %>%
+  dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
+                basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
+                basenetcnt = as.numeric(basenetcnt),
+
+                network_manip = "modularity",
+                param = "edgerm",
+                path = paste0(outdir,
+                              network_manip, "_",
+                              param, "_", val, "_",
+                              basenetcnt, ".RDS")) %>%
+  dplyr::arrange(param, val, basenetcnt) %>%
+  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+
+# write out networks out of scope
+mapply(function(x, y) { saveRDS(x, file = y) },
+       x = maestro_dfmodularity$new_network,
+       y = maestro_dfmodularity$path)
+# drop for mem
+maestro_dfmodularity <- maestro_dfmodularity %>%
+  dplyr::select(-c("new_network"))
 
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Clustering       ####
 #++++++++++++++++++++++++++++++++++++++++++
+# expand out grid to add edges between dyad pairs and make new clusters (triangles)
+clusted <- seq(5, 50, length.out = 10)
+dfclusted <- expand.grid(basenetpaths, clusted,
+                         stringsAsFactors = F) %>%
+  magrittr::set_colnames(c("basenetpath", "edge_add_num"))
 
 
+#......................
+# perform manipulations
+#......................
+dfclusted <- dfclusted %>%
+  dplyr::mutate(new_network = purrr::pmap(.,
+                                          wrapper_manip_clust_addedges))
+
+#......................
+# write these out
+#......................
+outdir <- "data/raw_data/cluster_networks/"
+dir.create(outdir, recursive = T)
+maestro_dfclusted <- dfclusted %>%
+  dplyr::rename(val = edge_add_num) %>%
+  dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
+                basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
+                basenetcnt = as.numeric(basenetcnt),
+
+                network_manip = "cluster",
+                param = "edgeadd",
+                path = paste0(outdir,
+                              network_manip, "_",
+                              param, "_", val, "_",
+                              basenetcnt, ".RDS")) %>%
+  dplyr::arrange(param, val, basenetcnt) %>%
+  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+
+# write out networks out of scope
+mapply(function(x, y) { saveRDS(x, file = y) },
+       x = maestro_dfclusted$new_network,
+       y = maestro_dfclusted$path)
+# drop for mem
+maestro_dfclusted <- maestro_dfclusted %>%
+  dplyr::select(-c("new_network"))
 
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Neighbor Exchange       ####
 #++++++++++++++++++++++++++++++++++++++++++
+nexchange_rate <- sapply(seq(9, 0), function(x){10^(-x)})
+# this function will capitalize on the internal functionality of `fomes` and
+# does not need a static network manipulation as above
+maestro_dfNEdyn <- expand.grid(basenetpaths, nexchange_rate,
+                               stringsAsFactors = F) %>%
+  magrittr::set_colnames(c("path", "val")) %>%
+  dplyr::mutate(network_manip = "NEdynamicity",
+                param = "exchrate") %>%
+  dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
+                basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
+                basenetcnt = as.numeric(basenetcnt)) %>%
+  dplyr::arrange(param, val, basenetcnt) %>%
+  dplyr::select(c("network_manip", "param", "val", "path"))
 
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -143,3 +235,9 @@ maestro_dfdegdist <- maestro_dfdegdist %>%
 #++++++++++++++++++++++++++++++++++++++++++
 # sanity check
 ls()[ grepl(pattern = "maestro_*", ls()) ]
+
+maestro_dfcomb <- dplyr::bind_rows(maestro_dfbase,
+                                   maestro_dfdegdist,
+                                   maestro_dfmodularity,
+                                   maestro_dfclusted,
+                                   maestro_dfNEdyn)

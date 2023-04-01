@@ -11,7 +11,7 @@
 # Data files priv/too large
 sandbox/
 ignore/
-
+raw_data/
 # knitr and R markdown default cache directories
 /*_cache/
 /cache/

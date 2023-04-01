@@ -1,11 +1,51 @@
+## .................................................................................
+## Purpose: Functions for creating the network manipulations used within maestro
+##
+## Notes:
+## .................................................................................
+
+#' @title Generate Base Networks with Erdos Renyi Algorithm
+#' @inheritParams igraph erdos.renyi.game
+#' @param nm numeric; base network name
+#' @param outdir char; path base for base network
+#' @description simple function to save out nets
+#' @importFrom igraph erdos.renyi.game
+#' @returns igraph network and writes it out to outdir
+#
+mk_base_nets_sout <- function(nm, n, p.or.m, type, outdir) {
+  # ER game
+  out <- igraph::erdos.renyi.game(
+    n = n,
+    p.or.m = p.or.m,
+    type = type )
+  # save out
+  saveRDS(out, paste0(outdir, nm, ".RDS"))
+}
+
+
+#' @title Wrapper for `manip_degdist`
+#' @noMd
+#' @return Number of overlaps (integer)
+
+manip_degdist_wrapper <- function(basenetpath, degprob, degvar, searches) {
+  grphnet <- readRDS(basenetpath)
+  out <- manip_degdist(graph_network = grphnet,
+                       degprob = degprob,
+                       degvar = degvar,
+                       searches = searches)
+  out <- out$best_overlapping_graph
+  return(out)
+}
+
 #' @title Use Random Search to Manipulate the Degree Distribution of a Network
 #' @param graph_network input graph (class igraph)
 #' @param degprob numeric; edge density probability per node
-#' @description
+#' @description Function to find most overlaps when manipulating the degree
+#' distribution of an original network
 #' @details
 #' @importFrom truncnorm rtruncnorm
-#' @importFrom igraph
-#' @returns
+#' @importFrom igraph degree.sequence.game, intersection, ecount
+#' @returns list containing dataframe of searches for networks and the best network
 
 manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
                           searches = 1e3) {
@@ -27,30 +67,58 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
   }, m = degprob, v = degvar)
   new_edge_density <- round( new_edge_density * nodecount )
   # generate random numbers for search
-  rands <- sample(1:.Machine$integer.max, size = searches, replace = F)
-
+  seednum <- sample(1:searches*1e2, size = searches, replace = F)
 
   #......................
   # core
   #......................
-  # identify new potential graphs
-  # cost is based on edges that are shared
-  sapply(rands, function(seednum, new_edge_density, graph_network){
-    seed(seednum)
+  ## FUNCTION for doing search
+  # identify new potential graphs based on overlaps to curr graph
+  identify_potent_deggraphs <- function(seednum, new_edge_density, graph_network){
+    # seed
+    set.seed(seednum)
+    # make new graph
     new_graph_network <- igraph::degree.sequence.game(out.deg = new_edge_density,
                                                       method = "vl")
+    # calculate overlaps --> cost is based on edges that are shared
     overlaps <- igraph::graph.intersection(graph_network, new_graph_network)
+    overlaps <- igraph::ecount(overlaps)
 
     # out
-    out <- tibble(randnum = seednum, overlaps = overlaps)
-    return(out)
-  }, new_edge_density = new_edge_density, graph_network = graph_network)
+    return(overlaps)
+  }
+
+  # put together in dfmap
+  pot_graphs_df <- tibble::tibble(seednum = seednum,
+                                  new_edge_density = list(new_edge_density),
+                                  graph_network = list(graph_network))
+  # do search
+  pot_graphs_df <- pot_graphs_df %>%
+    dplyr::mutate(overlaps = purrr::pmap_dbl(., identify_potent_deggraphs)) %>%
+    dplyr::select(c("seednum", "overlaps"))
 
 
+  # identify best graph
+  bst_sd <- pot_graphs_df %>%
+    dplyr::filter(overlaps == max(overlaps)) %>%
+    dplyr::pull(seednum)
+
+  # catch multiple maxes
+  if (length(bst_sd) > 1) {
+    rw <- sample(1:length(bst_sd), size = 1)
+    bst_sd <- bst_sd[rw]
+  }
+  # set seed
+  set.seed(bst_sd)
+  bst_ovlp_grph <- igraph::degree.sequence.game(out.deg = new_edge_density,
+                                                 method = "vl")
   #......................
   # out
   #......................
-  return()
+  # tidy up
+  out <- list(best_overlapping_graph = bst_ovlp_grph,
+              potential_graphs_df = pot_graphs_df)
+  return(out)
 }
 
 

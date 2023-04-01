@@ -26,7 +26,6 @@ mk_base_nets_sout <- function(nm, n, p.or.m, type, outdir) {
 #' @title Wrapper for `manip_degdist`
 #' @noMd
 #' @return Number of overlaps (integer)
-
 manip_degdist_wrapper <- function(basenetpath, degprob, degvar, searches) {
   grphnet <- readRDS(basenetpath)
   out <- manip_degdist(graph_network = grphnet,
@@ -47,8 +46,7 @@ manip_degdist_wrapper <- function(basenetpath, degprob, degvar, searches) {
 #' @importFrom igraph degree.sequence.game, intersection, ecount
 #' @returns list containing dataframe of searches for networks and the best network
 
-manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
-                          searches = 1e3) {
+manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0, searches = 1e3) {
   #......................
   # checks
   #......................
@@ -74,7 +72,8 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
   #......................
   ## FUNCTION for doing search
   # identify new potential graphs based on overlaps to curr graph
-  identify_potent_deggraphs <- function(seednum, new_edge_density, graph_network){
+  identify_potent_deggraphs <- function(seednum, new_edge_density,
+                                        graph_network) {
     # seed
     set.seed(seednum)
     # make new graph
@@ -111,7 +110,7 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
   # set seed
   set.seed(bst_sd)
   bst_ovlp_grph <- igraph::degree.sequence.game(out.deg = new_edge_density,
-                                                 method = "vl")
+                                                method = "vl")
   #......................
   # out
   #......................
@@ -123,9 +122,45 @@ manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0,
 
 
 
+#' @title Increase Network Modularity by Removing Connected Edges
+#' @inheritParams manip_degdist
+#' @param edge_rm_num int; Number of edges to remove from current graph
+#' @description To increase modularity of a given network, a number of well-connected
+#' edges are removed. Edge connectedness is determined by the \code{igraph::edge_betweenness}
+#' function. The process is deterministic with the most connected edges being removed
+#' sequentially
+#' @returns networks graph (class igraph)
+
+manip_modular_rmedges <- function(graph_network, edge_rm_num) {
+  #......................
+  # checks
+  #......................
+  goodegg::assert_eq("igraph", class(graph_network),
+                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+  goodegg::assert_single_int(edge_rm_num)
+
+  #......................
+  # core
+  #......................
+  # identify most connected edges by betweeness
+  btwnconn <- igraph::edge_betweenness(graph_network, directed = F)
+  # drop num edges specified based on most connected
+  btwnord <- rev( order(btwnconn) )[1:edge_rm_num]
+  # drop edges
+  new_mod <- igraph::delete_edges(graph = graph_network,
+                                  edges = E(graph_network)[btwnord])
+  #......................
+  # out
+  #......................
+  return(new_mod)
+}
 
 
-#' @title Identify Potential Edges to Create Triangles in Network
+
+
+
+
+#' @title Identify Potential Edges to Create Triangles (Clustering) in Network
 #' @inheritParams manip_degdist
 #' @description Identifies potential edges that would create triangles from
 #' the input network. Returns those edges as an A(i,j) listing, where A is the adjacency
@@ -177,8 +212,8 @@ get_potential_triangle_edges <- function(graph_network) {
     } # end nested for loop
   } # end if/else corner case catch
 
- #......................
- # out
- #......................
+  #......................
+  # out
+  #......................
   return(newtri_conns)
 }

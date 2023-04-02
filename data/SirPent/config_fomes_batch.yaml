@@ -1,0 +1,8 @@
+# configuration for simulation runs
+
+logs: jobs
+tmpdir: .tmp
+threads: 6
+memory: 12
+
+simmap: ../raw_data/maestro_map.tsv

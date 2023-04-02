@@ -11,9 +11,20 @@ library(tibble)
 library(igraph)
 
 #++++++++++++++++++++++++++++++++++++++++++
-### Magic Number Source        ####
+### Project Immutables        ####
 #++++++++++++++++++++++++++++++++++++++++++
-source("data/raw_data/magic_numbers.R")
+# meaning of life
+seed <- 42
+# population size
+N <- 1e3
+# ER base probability for generating networks
+baseERprob <- 0.3
+
+
+#++++++++++++++++++++++++++++++++++++++++++
+### Source Functions and Seed        ####
+#++++++++++++++++++++++++++++++++++++++++++
+source("R/network_manipulations.R")
 set.seed(seed)
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -32,8 +43,12 @@ set.seed(seed)
 #......................
 # STEP 0: generate beta and duration of illness
 #......................
-betaI <- seq(0.1, 1, length.out = 25)
-durationI <- seq(2,50, by = 2)
+#betaI <- seq(0.1, 1, length.out = 25)
+#durationI <- seq(2,50, by = 2)
+
+betaI <- seq(0.1, 1, length.out = 10)
+durationI <- 5
+
 
 #......................
 # STEP 1: generate 10 base networks
@@ -236,8 +251,23 @@ maestro_dfNEdyn <- expand.grid(basenetpaths, nexchange_rate,
 # sanity check
 ls()[ grepl(pattern = "maestro_*", ls()) ]
 
-maestro_dfcomb <- dplyr::bind_rows(maestro_dfbase,
-                                   maestro_dfdegdist,
-                                   maestro_dfmodularity,
-                                   maestro_dfclusted,
-                                   maestro_dfNEdyn)
+# combine network rows
+maestro <- dplyr::bind_rows(maestro_dfbase,
+                            maestro_dfdegdist,
+                            maestro_dfmodularity,
+                            maestro_dfclusted,
+                            maestro_dfNEdyn)
+# bring in SIR params
+sirparams <- tibble::tibble(betaI = betaI,
+                            durationI = durationI)
+maestro <- dplyr::bind_cols(sirparamsl, maestro_dfcomb)
+
+# add in replicates/iterations
+maestro <- maestro %>%
+  dplyr::mutate(reps = 1e2)
+
+
+#......................
+# save out map file for snakemake
+#......................
+readr::write_tsv(maestro, file = "data/raw_data/maestro_map.tsv")

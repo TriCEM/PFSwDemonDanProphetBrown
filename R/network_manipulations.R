@@ -86,79 +86,86 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
   #......................
   # setup (const, storage, etc)
   #......................
-  # new degree sequence based on mean and variance
-  nodecount <- vcount(graph_network)
-  new_edge_density <- sapply(1:nodecount, function(x, m, v){
-    out <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = m, sd = sqrt(v))
-    return(out)
-  }, m = degprob, v = degvar)
-  new_edge_density <- round( new_edge_density * nodecount )
-  # generate random numbers for search
-  seednum <- sample(1:searches*1e2, size = searches, replace = F)
+  # identify edges that are needed
+  nodecount <- igraph::vcount(graph_network)
+  curr_edges <- igraph::ecount(graph_network)
+  new_edges <- round( new_degprob * (nodecount * (nodecount - 1) / 2 ))
+  need_ed <- new_edges - curr_edges
+  # plan to manipulate in place
+  new_graph_network <- graph_network
+  # identify all potential edges
+  pot_edges <- igraph::simplify(igraph::complementer(graph_network))
 
+  # catch zero
+  if (new_degvar == 0) {
+    new_degvar <- .Machine$double.xmin
+  }
   #......................
   # core
   #......................
-  ## FUNCTION for doing search
-  # identify new potential graphs based on overlaps to curr graph
-  identify_potent_deggraphs <- function(seednum, new_edge_density,
-                                        graph_network) {
-    # seed
-    set.seed(seednum)
-    # make new graph
-    new_graph_network <- igraph::degree.sequence.game(out.deg = new_edge_density,
-                                                      method = "vl")
-    # calculate overlaps --> cost is based on edges that are shared
-    overlaps <- igraph::graph.intersection(graph_network, new_graph_network)
-    overlaps <- igraph::ecount(overlaps)
+  # account for edge dispersion based on variance
+  node_degchanges <- finite_crp_network(graph_network = graph_network,
+                                        edge_delta = need_ed,
+                                        theta = 1/new_degvar)
 
-    # out
-    return(overlaps)
+  # add or delete edges accordingly
+  node_degchanges <- node_degchanges - degree(graph_network)
+  for (i in 1:length(node_degchanges)) {
+    #......................
+    # ADDING edges
+    #......................
+    if (node_degchanges[i] > 0) {
+      # identify edges with node of interest
+      edges_with_node <- igraph::incident(graph = pot_edges, v = node_degchanges[i])
+      # catch if we need to add more edges than is possible
+      if (length(edges_with_node) < node_degchanges[i]) {
+        edges_to_add <- edges_with_node
+      } else {
+        edges_to_add <- sample(x = edges_with_node, size = node_degchanges[i])
+      }
+      # class liftover
+      edges_to_add <- igraph::ends(pot_edges, edges_to_add)
+      # make changes
+      graph_network <- igraph::add_edges(graph = graph_network,
+                                         edges = edges_to_add)
+
+      #......................
+      # Removing edges
+      #......................
+    } else {
+      # identify edges with node of interest
+      edges_with_node <- igraph::incident(graph = graph_network, v = node_degchanges[i])
+      # catch if we need to add more edges than is possible
+      if (length(edges_with_node) < node_degchanges[i]) {
+        edges_to_rm <- edges_with_node
+      } else {
+        edges_to_rm <- sample(x = edges_with_node, size = node_degchanges[i])
+      }
+      # class liftover
+      edges_to_rm <- igraph::ends(pot_edges, edges_to_rm)
+      # make changes
+      graph_network <- igraph::delete_edges(graph = graph_network,
+                                            edges = edges_to_rm)
+    }
   }
 
-  # put together in dfmap
-  pot_graphs_df <- tibble::tibble(seednum = seednum,
-                                  new_edge_density = list(new_edge_density),
-                                  graph_network = list(graph_network))
-  # do search
-  pot_graphs_df <- pot_graphs_df %>%
-    dplyr::mutate(overlaps = purrr::pmap_dbl(., identify_potent_deggraphs)) %>%
-    dplyr::select(c("seednum", "overlaps"))
-
-
-  # identify best graph
-  bst_sd <- pot_graphs_df %>%
-    dplyr::filter(overlaps == max(overlaps)) %>%
-    dplyr::pull(seednum)
-
-  # catch multiple maxes
-  if (length(bst_sd) > 1) {
-    rw <- sample(1:length(bst_sd), size = 1)
-    bst_sd <- bst_sd[rw]
-  }
-  # set seed
-  set.seed(bst_sd)
-  bst_ovlp_grph <- igraph::degree.sequence.game(out.deg = new_edge_density,
-                                                method = "vl")
   #......................
   # out
   #......................
-  # tidy up
-  out <- list(best_overlapping_graph = bst_ovlp_grph,
-              potential_graphs_df = pot_graphs_df)
-  return(out)
+  return(graph_network)
 }
+
+
+
 
 #' @title Wrapper for `manip_degdist`
 #' @noMd
 #' @return igraph network
-wrapper_manip_degdist <- function(basenetpath, degprob, degvar, searches) {
+wrapper_manip_degdist <- function(basenetpath, new_degprob, new_degvar) {
   grphnet <- readRDS(basenetpath)
   out <- manip_degdist(graph_network = grphnet,
-                       degprob = degprob,
-                       degvar = degvar,
-                       searches = searches)
-  out <- out$best_overlapping_graph
+                       new_degprob = degprob,
+                       new_degvar = degvar)
   return(out)
 }
 

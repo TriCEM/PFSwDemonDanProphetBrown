@@ -4,36 +4,78 @@
 ## Notes:
 ## .................................................................................
 
-#' @title Generate Base Networks with Erdos Renyi Algorithm
-#' @inheritParams igraph erdos.renyi.game
-#' @param nm numeric; base network name
+#' @title Generate Base Networks with Degree Sequence Algorithm
+#' @inheritParams igraph degree.sequence.game
+#' @param n integer; Node count
 #' @param outdir char; path base for base network
 #' @description simple function to save out nets
 #' @importFrom igraph erdos.renyi.game
 #' @returns igraph network and writes it out to outdir
 #
-mk_base_nets_sout <- function(nm, n, p.or.m, type, outdir) {
+mk_base_nets_sout <- function(n, out.deg, outdir) {
   # ER game
-  out <- igraph::erdos.renyi.game(
-    n = n,
-    p.or.m = p.or.m,
-    type = type )
+  out <- igraph::degree.sequence.game(out.deg = rep(degden, n),
+                                      method = "vl", )
   # save out
   saveRDS(out, paste0(outdir, nm, ".RDS"))
 }
 
 
-#' @title Use Random Search to Manipulate the Degree Distribution of a Network
+
+#' @title Finite CRP for Network Code
 #' @param graph_network input graph (class igraph)
-#' @param degprob numeric; edge density probability per node
-#' @description Function to find most overlaps when manipulating the degree
-#' distribution of an original network
+#' @param edge_delta integer; number of edges to add or remove
+#' @param theta numeric; concentration parameter
+#' @description
+#' @details Assumes that there is already a base categorical distribution
+#' and that all of the finite tables have been identified, and we are just
+#' adding individuals to those existing tables
+#' @returns New Degree Distribution
+
+finite_crp_network <- function(graph_network, edge_delta, theta) {
+  #......................
+  # checks
+  #......................
+  goodegg::assert_eq("igraph", class(graph_network),
+                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+  goodegg::assert_single_numeric(theta)
+  goodegg::assert_single_pos(theta)
+  goodegg::assert_single_int(edge_delta)
+
+  #......................
+  # setup (const, storage, etc)
+  #......................
+  x <- degree(graph_network)
+  # catch if removing edges versus adding
+  if (edge_delta < 0) {
+    x <- x * -1
+  }
+  #......................
+  # core
+  #......................
+  for (i in 1:edge_delta) {
+    prd <- x/(i - 1 + theta)
+    td <- sample(1:length(x), 1, prob = prd)
+    x[td] <- x[td] + 1
+  }
+  #......................
+  # out
+  #......................
+  return(abs(x))
+}
+
+
+#' @title Randomly Adds or Removes Edges to Manipulate the Degree Distribution of a Network
+#' @param graph_network input graph (class igraph)
+#' @param new_degprob numeric; edge density probability per node
+#' @param new_degvar numeric; edge density probability per node
 #' @details
 #' @importFrom truncnorm rtruncnorm
 #' @importFrom igraph degree.sequence.game, intersection, ecount
 #' @returns list containing dataframe of searches for networks and the best network
 
-manip_degdist <- function(graph_network, degprob = 0.5, degvar = 0, searches = 1e3) {
+manip_degdist <- function(graph_network, new_degprob = 0.5,
+                          new_degvar = 5) {
   #......................
   # checks
   #......................

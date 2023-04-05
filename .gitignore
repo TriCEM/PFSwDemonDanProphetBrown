@@ -5,6 +5,9 @@
 # RStudio files
 .Rproj.user/
 
+# snakemake files
+.snakemake/
+
 # Session Data files
 .RData
 

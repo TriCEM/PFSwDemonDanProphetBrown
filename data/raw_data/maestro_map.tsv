@@ -1,0 +1,11 @@
+betaI	durationI	network_manip	param	val	path	reps	outpath
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_1.RDS	100	SimRet_baseb0-base_b0_1-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_2.RDS	100	SimRet_baseb0-base_b0_2-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_3.RDS	100	SimRet_baseb0-base_b0_3-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_4.RDS	100	SimRet_baseb0-base_b0_4-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_5.RDS	100	SimRet_baseb0-base_b0_5-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_6.RDS	100	SimRet_baseb0-base_b0_6-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_7.RDS	100	SimRet_baseb0-base_b0_7-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_8.RDS	100	SimRet_baseb0-base_b0_8-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_9.RDS	100	SimRet_baseb0-base_b0_9-reps100.RDS
+data/raw_data/SRIparams/betavals.RDS	data/raw_data/SRIparams/durIvals.RDS	base	b	0	data/raw_data/base_networks/base_b0_10.RDS	100	SimRet_baseb0-base_b0_10-reps100.RDS

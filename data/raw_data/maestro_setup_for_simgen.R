@@ -11,21 +11,12 @@ library(tibble)
 library(igraph)
 
 #++++++++++++++++++++++++++++++++++++++++++
-### Project Immutables        ####
-#++++++++++++++++++++++++++++++++++++++++++
-# meaning of life
-seed <- 42
-# population size
-N <- 1e3
-# ER base probability for generating networks
-baseERprob <- 0.3
-
-
-#++++++++++++++++++++++++++++++++++++++++++
-### Source Functions and Seed        ####
+### Source Functions and Immutables        ####
 #++++++++++++++++++++++++++++++++++++++++++
 source("R/network_manipulations.R")
-set.seed(seed)
+set.seed(42) # meaning of life
+# population size
+N <- 1e3
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Maestro Setup                      ####
@@ -35,7 +26,7 @@ set.seed(seed)
 #  * 25 duration of illness
 #  * 10 "base" ER networks that will be adjusted by network mechanisms (default is p = 0.3)
 #    * Network mechanisms:
-#      * 10 degree distributions
+#      * 10 * 5 degree distributions
 #      * 10 modularity models
 #      * 10 clustering
 #      * 10 neighbor exchange rate
@@ -45,27 +36,34 @@ set.seed(seed)
 #......................
 #betaI <- seq(0.1, 1, length.out = 25)
 #durationI <- seq(2,50, by = 2)
-
-betaI <- seq(0.1, 1, length.out = 10)
+betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
 durationI <- 5
-
+# save out beta and duration for exportability w/ snakemake
+dir.create("data/raw_data/SRIparams/", recursive = T)
+betapath <- "data/raw_data/SRIparams/betavals.RDS"
+durIpath <- "data/raw_data/SRIparams/durIvals.RDS"
+saveRDS(betaI, file = betapath)
+saveRDS(durationI, file = durIpath)
 
 #......................
 # STEP 1: generate 10 base networks
 #......................
-netbasenames <- sapply(1:10, function(x) paste0("base_b0_", x))
 outdir <- "data/raw_data/base_networks/"
 dir.create(outdir, recursive = T)
+basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_b0_", x, ".RDS"))
 
-# save out to dir not w/in scope
-lapply(netbasenames, mk_base_nets_sout,
-       n = N, p.or.m = baseERprob, type = "gnp", outdir = outdir)
+# create networks with igraph degree sequence game
+base_networks <- replicate(10, igraph::degree.sequence.game(out.deg = rep(200, N),
+                             method = "vl"))
+
+# save out
+mapply(function(x,y){saveRDS(x, file = y)},
+       x = base_networks, y = basenetpaths)
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Network Mechanisms        ####
 #++++++++++++++++++++++++++++++++++++++++++
 # Performing network manipulations on our 10 base models
-basenetpaths <- list.files(path = outdir, pattern = ".RDS", full.names = T)
 maestro_dfbase <- tibble::tibble(
   network_manip = "base",
   param = "b",
@@ -249,16 +247,22 @@ maestro <- dplyr::bind_rows(maestro_dfbase,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
 # bring in SIR params
-sirparams <- tibble::tibble(betaI = betaI,
-                            durationI = durationI)
-maestro <- dplyr::bind_cols(sirparamsl, maestro_dfcomb)
+sirparams <- tibble::tibble(betaI = betapath,
+                            durationI = durIpath)
+maestro <- dplyr::bind_cols(sirparams, maestro)
 
 # add in replicates/iterations
 maestro <- maestro %>%
   dplyr::mutate(reps = 1e2)
 
+# add in outpath
+maestro_out <- maestro %>%
+  dplyr::mutate(outpath = purrr::pmap_chr(., function(betaI, durationI, network_manip, param, val, reps, path){
+    paste0("SimRet_", network_manip, param, val, "-", sub(".RDS", "", basename(path)), "-reps", reps, ".RDS")}
+  ))
+
 
 #......................
 # save out map file for snakemake
 #......................
-readr::write_tsv(maestro, file = "data/raw_data/maestro_map.tsv")
+readr::write_tsv(maestro_out, file = "data/raw_data/maestro_map.tsv")

@@ -13,20 +13,54 @@ import yaml
 import re
 import pandas as pd
 
+## read project-specific configuration options and functions
+OUTROOT = config["outdir"]
+RROOT = config["Rdir"]
 def read_manifest(file_path):
     # read manifest and extract out relevant params
     df = pd.read_csv(file_path, sep='\t')
-    simparams = df.to_dict(orient='records')
+    simparams = df.to_dict()
     return simparams
 
-## read simulation manifest
-simulations = read_manifest(config["simmap"])
+## read simulation manifest as dictionary which we can iterate through
+sim_map = read_manifest(config["simmap"])
+# Manually transform dictionary to map "outpath" values to our wanted parameter values
+sim_dict = {sim_map['outpath'][i]: \
+{'betaI': sim_map['betaI'][i], \
+'durationI': sim_map['durationI'][i], \
+'network_manip': sim_map['network_manip'][i], \
+'param': sim_map['param'][i], \
+'val': sim_map['val'][i], \
+'path': sim_map['path'][i], \
+'reps': sim_map['reps'][i]} \
+for i in range(len(sim_map['outpath']))}
 
-## make targets
 
-
-## rules
+# rules
 rule all:
-	input: final_target
+    input: expand("{outpath}", outpath = list(sim_map["outpath"].values()))
 
-rule run_fomes:
+rule run_simulation:
+    output: "{outpath}"
+    params:
+        mod = lambda wildcards: sim_dict[wildcards.outpath]['network_manip'],
+        betaI = lambda wildcards: sim_dict[wildcards.outpath]['betaI'],
+        durationI = lambda wildcards: sim_dict[wildcards.outpath]['durationI'],
+        path = lambda wildcards: sim_dict[wildcards.outpath]['path'],
+        val = lambda wildcards: sim_dict[wildcards.outpath]['val'],
+        reps = lambda wildcards: sim_dict[wildcards.outpath]['reps'],
+        outdir = OUTROOT,
+        Rdir = RROOT,
+    shell:
+        r"""
+        Rscript /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/R/fomes_wrappers.R \
+        --mod {params.mod} \
+        --beta {params.betaI} \
+        --dur {params.durationI} \
+        --netpath {params.path} \
+        --val {params.val} \
+        --reps {params.reps} \
+        --output {output} \
+        --outdir {params.outdir} \
+        --Rdir {params.Rdir}
+        """

@@ -5,4 +5,6 @@ tmpdir: .tmp
 threads: 6
 memory: 12
 
-simmap: ../raw_data/maestro_map.tsv
+simmap: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/data/raw_data/maestro_map.tsv
+outdir: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/data/derived_data/
+Rdir: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/

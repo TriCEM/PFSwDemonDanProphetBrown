@@ -80,22 +80,12 @@ maestro_dfbase <- tibble::tibble(
 #++++++++++++++++++++++++++++++++++++++++++
 #### Degree Distribution        ####
 #++++++++++++++++++++++++++++++++++++++++++
-# expand out grid for degree distributions for homogenous variance
+# expand out grid for degree distributions for homogenous and heterogenous variance
 degprobdist <- seq(0.1, 1, length.out = 10)
-dfdegdist_homogen <- expand.grid(basenetpaths, degprobdist,
-                                 stringsAsFactors = F) %>%
-  magrittr::set_colnames(c("basenetpath", "degprob")) %>%
-  dplyr::mutate(degvar = 0)
-
-# expand out grid for degree distributions for heterogenous variance
-degvardist <- c(0.5, 1, 5, 10, 25)
-dfdegdist_hetero <- expand.grid(basenetpaths, degprobdist, degvardist,
+degvardist <- c(0, 1, 5, 10, 25, 50)
+dfdegdist <- expand.grid(basenetpaths, degprobdist, degvardist,
                                 stringsAsFactors = F) %>%
-  magrittr::set_colnames(c("basenetpath", "degprob", 'degvar'))
-
-# combine these and setup wrapper for search function
-dfdegdist <- dplyr::bind_rows(dfdegdist_homogen, dfdegdist_hetero) %>%
-  dplyr::mutate(searches = 1e3) %>%
+  magrittr::set_colnames(c("basenetpath", "degprob", 'degvar')) %>%
   tibble::as_tibble()
 
 #......................
@@ -104,7 +94,8 @@ dfdegdist <- dplyr::bind_rows(dfdegdist_homogen, dfdegdist_hetero) %>%
 # run manipulations via search using wrapper for mem optim
 dfdegdist <- dfdegdist %>%
   dplyr::mutate(new_network = purrr::pmap(.,
-                                          wrapper_manip_degdist))
+                                          wrapper_manip_degdist,
+                                          .progress = TRUE))
 
 #......................
 # write these out

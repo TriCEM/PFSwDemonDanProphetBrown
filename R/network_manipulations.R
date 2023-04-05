@@ -4,65 +4,62 @@
 ## Notes:
 ## .................................................................................
 
-#' @title Generate Base Networks with Degree Sequence Algorithm
-#' @inheritParams igraph degree.sequence.game
-#' @param n integer; Node count
-#' @param outdir char; path base for base network
-#' @description simple function to save out nets
-#' @importFrom igraph erdos.renyi.game
-#' @returns igraph network and writes it out to outdir
-#
-mk_base_nets_sout <- function(n, out.deg, outdir) {
-  # ER game
-  out <- igraph::degree.sequence.game(out.deg = rep(degden, n),
-                                      method = "vl", )
-  # save out
-  saveRDS(out, paste0(outdir, nm, ".RDS"))
-}
+#' @title Stick Breaking Process to Spread Edges
+#' @inheritParams manip_degdist
+#' @param edge_delta integer; Number of edges to spread out
+#' @description Use a stick-breaking process from a beta distribution
+#' with alpha = 1 and beta = new_deg var
+#' @importFrom truncnorm rtruncnorm
+#' @returns Vector of integers that correspond to edge changes
+#' @export
 
-
-
-#' @title Finite CRP for Network Code
-#' @param graph_network input graph (class igraph)
-#' @param edge_delta integer; number of edges to add or remove
-#' @param theta numeric; concentration parameter
-#' @description
-#' @details Assumes that there is already a base categorical distribution
-#' and that all of the finite tables have been identified, and we are just
-#' adding individuals to those existing tables
-#' @returns New Degree Distribution
-
-finite_crp_network <- function(graph_network, edge_delta, theta) {
+stickbreak_network <- function(graph_network,
+                               edge_delta,
+                               new_degvar) {
   #......................
   # checks
   #......................
-  goodegg::assert_eq("igraph", class(graph_network),
-                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
-  goodegg::assert_single_numeric(theta)
-  goodegg::assert_single_pos(theta)
   goodegg::assert_single_int(edge_delta)
+  goodegg::assert_single_pos(new_degvar)
 
   #......................
   # setup (const, storage, etc)
   #......................
-  x <- degree(graph_network)
-  # catch if removing edges versus adding
-  if (edge_delta < 0) {
-    x <- x * -1
-  }
+  nodecount <- igraph::vcount(graph_network)
+  remain_stick_length <- 1
+  wi <- rep(0, nodecount)
+
   #......................
   # core
   #......................
-  for (i in 1:edge_delta) {
-    prd <- x/(i - 1 + theta)
-    td <- sample(1:length(x), 1, prob = prd)
-    x[td] <- x[td] + 1
-  }
+  if (new_degvar == 0) {
+    edge_changes <- round(edge_delta/nodecount)
+    edge_changes <- rep(edge_changes, nodecount)
+
+  } else {
+    #......................
+    # draw weights through stick break
+    #......................
+    # run stick break
+    for (i in 1:nodecount) {
+      tsamp <- rbeta(1, 1, new_degvar)
+      wi[i] <- remain_stick_length * tsamp
+      remain_stick_length <- remain_stick_length * (1 - tsamp)
+    } # end for loop
+    # spread out edges
+    # NB, by rounding, we may end up with more or fewer edges than
+    # edge_delta, this should be minimal
+    edge_changes <- round( edge_delta * wi )
+  } # end else
+
   #......................
   # out
   #......................
-  return(abs(x))
+  return(edge_changes)
 }
+
+
+
 
 
 #' @title Randomly Adds or Removes Edges to Manipulate the Degree Distribution of a Network
@@ -70,9 +67,8 @@ finite_crp_network <- function(graph_network, edge_delta, theta) {
 #' @param new_degprob numeric; edge density probability per node
 #' @param new_degvar numeric; edge density probability per node
 #' @details
-#' @importFrom truncnorm rtruncnorm
-#' @importFrom igraph degree.sequence.game, intersection, ecount
-#' @returns list containing dataframe of searches for networks and the best network
+#' @return graph network updated for degree distribution
+#' @export
 
 manip_degdist <- function(graph_network, new_degprob = 0.5,
                           new_degvar = 5) {
@@ -81,6 +77,8 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
   #......................
   goodegg::assert_eq("igraph", class(graph_network),
                      message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+  goodegg::assert_single_pos(new_degprob)
+  goodegg::assert_single_pos(new_degvar)
 
 
   #......................
@@ -96,57 +94,53 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
   # identify all potential edges
   pot_edges <- igraph::simplify(igraph::complementer(graph_network))
 
-  # catch zero
-  if (new_degvar == 0) {
-    new_degvar <- .Machine$double.xmin
-  }
+
   #......................
   # core
   #......................
   # account for edge dispersion based on variance
-  node_degchanges <- finite_crp_network(graph_network = graph_network,
+  node_degchanges <- stickbreak_network(graph_network = graph_network,
                                         edge_delta = need_ed,
-                                        theta = 1/new_degvar)
+                                        new_degvar = new_degvar)
 
   # add or delete edges accordingly
-  node_degchanges <- node_degchanges - degree(graph_network)
   for (i in 1:length(node_degchanges)) {
+
+    # identify edges with node of interest
+    edges_with_node <- igraph::incident(graph = pot_edges, v = i)
     #......................
     # ADDING edges
     #......................
     if (node_degchanges[i] > 0) {
-      # identify edges with node of interest
-      edges_with_node <- igraph::incident(graph = pot_edges, v = node_degchanges[i])
       # catch if we need to add more edges than is possible
-      if (length(edges_with_node) < node_degchanges[i]) {
+      if (length(edges_with_node) < abs(node_degchanges[i])) {
         edges_to_add <- edges_with_node
       } else {
-        edges_to_add <- sample(x = edges_with_node, size = node_degchanges[i])
+        edges_to_add <- sample(x = edges_with_node, size = abs(node_degchanges[i]))
       }
       # class liftover
       edges_to_add <- igraph::ends(pot_edges, edges_to_add)
       # make changes
       graph_network <- igraph::add_edges(graph = graph_network,
                                          edges = edges_to_add)
-
       #......................
       # Removing edges
       #......................
-    } else {
-      # identify edges with node of interest
-      edges_with_node <- igraph::incident(graph = graph_network, v = node_degchanges[i])
-      # catch if we need to add more edges than is possible
-      if (length(edges_with_node) < node_degchanges[i]) {
+    } else if (node_degchanges[i] < 0) {
+      # catch if we need to rm more edges than is possible
+      if (length(edges_with_node) < abs(node_degchanges[i])) {
         edges_to_rm <- edges_with_node
       } else {
-        edges_to_rm <- sample(x = edges_with_node, size = node_degchanges[i])
+        edges_to_rm <- sample(x = edges_with_node, size = abs(node_degchanges[i]))
       }
       # class liftover
       edges_to_rm <- igraph::ends(pot_edges, edges_to_rm)
       # make changes
       graph_network <- igraph::delete_edges(graph = graph_network,
                                             edges = edges_to_rm)
-    }
+    } else {
+      next
+    } # end ifelse
   }
 
   #......................
@@ -161,7 +155,9 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
 #' @title Wrapper for `manip_degdist`
 #' @noMd
 #' @return igraph network
-wrapper_manip_degdist <- function(basenetpath, new_degprob, new_degvar) {
+#' @export
+
+wrapper_manip_degdist <- function(basenetpath, degprob, degvar) {
   grphnet <- readRDS(basenetpath)
   out <- manip_degdist(graph_network = grphnet,
                        new_degprob = degprob,
@@ -179,6 +175,7 @@ wrapper_manip_degdist <- function(basenetpath, new_degprob, new_degvar) {
 #' function. The process is deterministic with the most connected edges being removed
 #' sequentially
 #' @returns network graph (class igraph) with new modularity
+#' @export
 
 manip_modular_rmedges <- function(graph_network, edge_rm_num) {
   #......................
@@ -210,6 +207,8 @@ manip_modular_rmedges <- function(graph_network, edge_rm_num) {
 #' @title Wrapper for `manip_modular_rmedges`
 #' @noMd
 #' @return igraph network
+#' @export
+
 wrapper_manip_modular_rmedges <- function(basenetpath, edge_rm_num) {
   grphnet <- readRDS(basenetpath)
   out <- manip_modular_rmedges(graph_network = grphnet,
@@ -227,6 +226,7 @@ wrapper_manip_modular_rmedges <- function(basenetpath, edge_rm_num) {
 #' @details Based on premise of squaring adjacency matrices to identify nodes with
 #' path lengths of two
 #' @returns list of potential edges that would introduce new triangles in the graph
+#' @export
 
 get_potential_triangle_edges <- function(graph_network) {
   #......................
@@ -286,6 +286,7 @@ get_potential_triangle_edges <- function(graph_network) {
 #' @details Adds edges sequentially based on node numbering
 #' @importFrom PFSwDemonDanProphetBrown get_potential_triangle_edges
 #' @returns network graph (igraph class) with new triangle clusters
+#' @export
 
 manip_clust_addedges <- function(graph_network, edge_add_num) {
   #......................
@@ -324,6 +325,8 @@ manip_clust_addedges <- function(graph_network, edge_add_num) {
 #' @title Wrapper for `manip_clust_addedges`
 #' @noMd
 #' @return igraph network
+#' @export
+
 wrapper_manip_clust_addedges <- function(basenetpath, edge_add_num) {
   grphnet <- readRDS(basenetpath)
   out <- manip_clust_addedges(graph_network = grphnet,

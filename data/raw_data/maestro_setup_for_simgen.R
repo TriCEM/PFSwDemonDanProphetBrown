@@ -53,7 +53,8 @@ dir.create(outdir, recursive = T)
 basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_b0_", x, ".RDS"))
 
 # create networks with igraph degree sequence game
-base_networks <- replicate(10, igraph::degree.sequence.game(out.deg = rep(200, N),
+base_networks <- replicate(10,
+                           igraph::degree.sequence.game(out.deg = rep(200, N),
                              method = "vl"))
 
 # save out
@@ -104,7 +105,6 @@ maestro_dfdegdist <- dfdegdist %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
-
                 network_manip = "degreedist",
                 param = "mean-var",
                 val = purrr::map2_chr(degprob, degvar, function(x, y){paste(x, y, sep = "-")}),
@@ -139,7 +139,8 @@ dfmodularity <- expand.grid(basenetpaths, edgedrop,
 #......................
 dfmodularity <- dfmodularity %>%
   dplyr::mutate(new_network = purrr::pmap(.,
-                                          wrapper_manip_modular_rmedges))
+                                          wrapper_manip_modular_rmedges,
+                                          .progress = TRUE))
 
 #......................
 # write these out
@@ -151,7 +152,6 @@ maestro_dfmodularity <- dfmodularity %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
-
                 network_manip = "modularity",
                 param = "edgerm",
                 path = paste0(outdir,
@@ -171,13 +171,58 @@ maestro_dfmodularity <- maestro_dfmodularity %>%
 
 
 #++++++++++++++++++++++++++++++++++++++++++
+#### Unity       ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out grid for edges to remove to make modular communities
+edgeadd <- c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000)
+dfunity <- expand.grid(basenetpaths, edgeadd,
+                       stringsAsFactors = F) %>%
+  magrittr::set_colnames(c("basenetpath", "edge_add_num"))
+
+#......................
+# perform manipulations
+#......................
+dfunity <- dfunity %>%
+  dplyr::mutate(new_network = purrr::pmap(.,
+                                          wrapper_manip_unity_addedges,
+                                          .progress = TRUE))
+
+#......................
+# write these out
+#......................
+outdir <- "data/raw_data/unity_networks/"
+dir.create(outdir, recursive = T)
+maestro_dfunity <- dfunity %>%
+  dplyr::rename(val = edge_add_num) %>%
+  dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
+                basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
+                basenetcnt = as.numeric(basenetcnt),
+                network_manip = "unity",
+                param = "edgeadd",
+                path = paste0(outdir,
+                              network_manip, "_",
+                              param, "_", val, "_",
+                              basenetcnt, ".RDS")) %>%
+  dplyr::arrange(param, val, basenetcnt) %>%
+  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+
+# write out networks out of scope
+mapply(function(x, y) { saveRDS(x, file = y) },
+       x = maestro_dfunity$new_network,
+       y = maestro_dfunity$path)
+# drop for mem
+maestro_dfunity <- maestro_dfunity %>%
+  dplyr::select(-c("new_network"))
+
+
+#++++++++++++++++++++++++++++++++++++++++++
 #### Clustering       ####
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid to add edges between dyad pairs and make new clusters (triangles)
-clusted <- seq(5, 50, length.out = 10)
+clusted <- seq(from = 0.3, to = 0.75, by = 0.05)
 dfclusted <- expand.grid(basenetpaths, clusted,
                          stringsAsFactors = F) %>%
-  magrittr::set_colnames(c("basenetpath", "edge_add_num"))
+  magrittr::set_colnames(c("basenetpath", "new_transitivity_prob"))
 
 
 #......................
@@ -185,7 +230,8 @@ dfclusted <- expand.grid(basenetpaths, clusted,
 #......................
 dfclusted <- dfclusted %>%
   dplyr::mutate(new_network = purrr::pmap(.,
-                                          wrapper_manip_clust_addedges))
+                                          wrapper_manip_clust_edges,
+                                          .progress = TRUE))
 
 #......................
 # write these out
@@ -197,9 +243,8 @@ maestro_dfclusted <- dfclusted %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
-
                 network_manip = "cluster",
-                param = "edgeadd",
+                param = "transitivity",
                 path = paste0(outdir,
                               network_manip, "_",
                               param, "_", val, "_",

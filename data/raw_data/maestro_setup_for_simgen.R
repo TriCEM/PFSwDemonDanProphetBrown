@@ -54,7 +54,7 @@ basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_b0_", x, ".RDS"))
 
 # create networks with igraph degree sequence game
 base_networks <- replicate(10,
-                           igraph::degree.sequence.game(out.deg = rep(200, N),
+                           igraph::degree.sequence.game(out.deg = rep(50, N),
                              method = "vl"))
 
 # save out
@@ -68,7 +68,7 @@ mapply(function(x,y){saveRDS(x, file = y)},
 maestro_dfbase <- tibble::tibble(
   network_manip = "base",
   param = "b",
-  val = 0,
+  val = as.character(0),
   path = basenetpaths) %>%
   dplyr::mutate(num = stringr::str_extract(path, "[0-9]*.RDS"),
                 num = stringr::str_replace(num, ".RDS", ""),
@@ -148,7 +148,7 @@ dfmodularity <- dfmodularity %>%
 outdir <- "data/raw_data/modularity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfmodularity <- dfmodularity %>%
-  dplyr::rename(val = edge_rm_num) %>%
+  dplyr::rename(val = as.charcater(edge_rm_num)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
@@ -193,7 +193,7 @@ dfunity <- dfunity %>%
 outdir <- "data/raw_data/unity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfunity <- dfunity %>%
-  dplyr::rename(val = edge_add_num) %>%
+  dplyr::rename(val = as.character(edge_add_num)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
@@ -239,7 +239,7 @@ dfclusted <- dfclusted %>%
 outdir <- "data/raw_data/cluster_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfclusted <- dfclusted %>%
-  dplyr::rename(val = edge_add_num) %>%
+  dplyr::rename(val = as.character(new_transitivity_prob)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
@@ -271,8 +271,9 @@ maestro_dfNEdyn <- expand.grid(basenetpaths, nexchange_rate,
                                stringsAsFactors = F) %>%
   magrittr::set_colnames(c("path", "val")) %>%
   dplyr::mutate(network_manip = "NEdynamicity",
-                param = "exchrate") %>%
-  dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
+                param = "exchrate",
+                val = as.character(val)) %>%
+  dplyr::mutate(basenetcnt = stringr::str_extract(path, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt)) %>%
   dplyr::arrange(param, val, basenetcnt) %>%

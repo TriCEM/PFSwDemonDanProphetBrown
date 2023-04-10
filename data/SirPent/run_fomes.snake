@@ -53,7 +53,7 @@ rule run_simulation:
         Rdir = RROOT,
     shell:
         r"""
-        Rscript /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/R/fomes_wrappers.R \
+        Rscript /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/R/fomes_wrappers.R \
         --mod {params.mod} \
         --beta {params.betaI} \
         --dur {params.durationI} \

@@ -18,6 +18,7 @@ ignore/
 data/raw_data/base_networks/
 data/raw_data/degreedist_networks/
 data/raw_data/modularity_networks/
+data/raw_data/unity_networks/
 data/raw_data/cluster_networks/
 
 # knitr and R markdown default cache directories

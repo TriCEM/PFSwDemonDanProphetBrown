@@ -1,7 +1,7 @@
 #! /bin/bash
 
-ROOT=/proj/emchlab/users/NickB/PFSwDemonDanProphetBrown # root directory for project (non-scratch)
-WD=/pine/scr/n/f/nfb/Projects/PFSwDemonDanProphetBrown/ # scratch directory for networks
+ROOT=/proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown # root directory for project (non-scratch)
+WD=/pine/scr/n/f/nfb/Projects/Projects/PFSwDemonDanProphetBrown/ # scratch directory for networks
 NODES=1028 # max number of cluster nodes
 WAIT=30 # number of seconds to wait for files to appear, absorbing some file system latency
 

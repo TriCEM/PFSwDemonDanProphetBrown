@@ -20,6 +20,7 @@ data/raw_data/degreedist_networks/
 data/raw_data/modularity_networks/
 data/raw_data/unity_networks/
 data/raw_data/cluster_networks/
+data/raw_data/SIRparams/
 data/derived_data/
 
 # knitr and R markdown default cache directories

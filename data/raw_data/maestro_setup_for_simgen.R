@@ -39,9 +39,9 @@ N <- 1e3
 betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
 durationI <- 5
 # save out beta and duration for exportability w/ snakemake
-dir.create("data/raw_data/SRIparams/", recursive = T)
-betapath <- "data/raw_data/SRIparams/betavals.RDS"
-durIpath <- "data/raw_data/SRIparams/durIvals.RDS"
+dir.create("data/raw_data/SIRparams/", recursive = T)
+betapath <- "data/raw_data/SIRparams/betavals.RDS"
+durIpath <- "data/raw_data/SIRparams/durIvals.RDS"
 saveRDS(betaI, file = betapath)
 saveRDS(durationI, file = durIpath)
 

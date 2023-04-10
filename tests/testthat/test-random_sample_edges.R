@@ -130,6 +130,7 @@ plot(gnet,
      vertex.label.font = 2)
 adj_mat <- igraph::as_adjacency_matrix(gnet, sparse = F)
 adj_matsq <- adj_mat %*% adj_mat
+adj_matsq
 
 #......................
 # normal case
@@ -138,6 +139,11 @@ plot(gnet_add,
      vertex.label = V(gnet_add)$name,
      vertex.label.dist = 3,
      vertex.label.font = 2)
-adj_mat <- igraph::as_adjacency_matrix(gnet_add, sparse = F)
-adj_matsq <- adj_mat %*% adj_mat
+adj_matadd <- igraph::as_adjacency_matrix(gnet_add, sparse = F)
+adj_matsqadd  <- adj_matadd %*% adj_matadd
+adj_matsqadd
 
+
+
+adj_matsq
+adj_matsqadd

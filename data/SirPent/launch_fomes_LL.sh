@@ -7,7 +7,7 @@ WAIT=30 # number of seconds to wait for files to appear, absorbing some file sys
 
 snakemake \
 	--snakefile $ROOT/data/SirPent/run_fomes.snake \
-	--configfile $ROOT/data/SirPent/config_fomes_batch.yaml \
+	--configfile $ROOT/data/SirPent/config_fomes_batch_LL.yaml \
 	--printshellcmds \
 	--directory $WD \
 	--cluster $ROOT/data/SirPent/launch_lite.py \

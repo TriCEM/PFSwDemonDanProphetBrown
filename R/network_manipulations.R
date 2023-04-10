@@ -216,6 +216,70 @@ wrapper_manip_modular_rmedges <- function(basenetpath, edge_rm_num) {
   return(out)
 }
 
+#' @title Increase Network Unity by Adding Connected Edges
+#' @inheritParams manip_degdist
+#' @param edge_add_num int; Number of edges to add from current graph
+#' @description To increase unity of a given network, a number of well-connected
+#' edges that could exist in the saturated graph (as identified with \code{igraph::complementer`}
+#' are added. Edge connectedness is determined by the \code{igraph::edge_betweenness}
+#' function. The process is deterministic with the most connected edges being added
+#' sequentially
+#' @returns network graph (class igraph) with new modularity
+#' @export
+
+manip_unity_addedges <- function(graph_network, edge_add_num) {
+  #......................
+  # checks
+  #......................
+  goodegg::assert_eq("igraph", class(graph_network),
+                     message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
+  goodegg::assert_single_int(edge_add_num)
+  #......................
+  # setup (const, storage, etc)
+  #......................
+  new_mod <- graph_network
+  comp_graph_network <- igraph::complementer(graph_network)
+
+  #......................
+  # core
+  #......................
+  # identify most connected edges by betweeness from the complemented graph
+  btwnconn <- igraph::edge_betweenness(comp_graph_network, directed = F)
+  # add num edges specified based on most connected
+  btwnord <- rev( order(btwnconn) )[1:edge_add_num]
+  # because this is a different graph than original, we need to do perform additional unpacking/descriptive work
+  new_edges_to_add <- igraph::ends(comp_graph_network, igraph::E(comp_graph_network)[btwnord])
+  # add edges
+  # modify graph in place (clearer/slightly safer than doing this w/ vector form in igraph)
+  for (i in 1:nrow(new_edges_to_add)) {
+    new_mod <- igraph::add_edges(graph = new_mod,
+                                 edges = c(new_edges_to_add[i,1], # from
+                                           new_edges_to_add[i,2])) # to
+  }
+
+  #......................
+  # out
+  #......................
+  return(new_mod)
+}
+
+
+
+
+#' @title Wrapper for `manip_unity_addedges`
+#' @noMd
+#' @return igraph network
+#' @export
+
+wrapper_manip_unity_addedges <- function(basenetpath, edge_add_num) {
+  grphnet <- readRDS(basenetpath)
+  out <- manip_unity_addedges(graph_network = grphnet,
+                              edge_add_num = edge_add_num)
+  return(out)
+}
+
+
+
 
 
 #' @title Identify Potential Edges to Create Triangles (Clustering) in Network
@@ -223,8 +287,10 @@ wrapper_manip_modular_rmedges <- function(basenetpath, edge_rm_num) {
 #' @description Identifies potential edges that would create triangles from
 #' the input network. Returns those edges as an A(i,j) listing, where A is the adjacency
 #' matrix
-#' @details Based on premise of squaring adjacency matrices to identify nodes with
-#' path lengths of two
+#' @details Based on premise of the cross product of an adjacency matrix with itself
+#' will identify common neighbors, which can then be used to identify nodes
+#' that could have potential triangular relationships. NB, this relationship is only
+#' true for undirected, symmetric network (otherwise the transpose is needed)
 #' @returns list of potential edges that would introduce new triangles in the graph
 #' @export
 
@@ -238,9 +304,7 @@ get_potential_triangle_edges <- function(graph_network) {
   #......................
   # setup
   #......................
-  # storage
-  newtri_conns <- list()
-  # squared adjacency matrix gives all paths of 2 (Gilbert Strang, pg 78)
+  # squared adjacency matrix gives common neighbors and path lengths (Gilbert Strang, pg 78)
   gnet_adjmat <- igraph::as_adjacency_matrix(graph_network, sparse = F)
   gnet_adjmatsq <- gnet_adjmat %*% gnet_adjmat
   # drop out elements we don't need to avoid redundancies (matrix is symmetric)
@@ -250,26 +314,14 @@ get_potential_triangle_edges <- function(graph_network) {
   #......................
   # core
   #......................
-  # corner case and normal case
-  if ( all(gnet_adjmatsq[lower.tri(gnet_adjmatsq)] %in% c(0,1)) ) { # catch corner case of line or perimeter
-    for(i in 1:nrow(gnet_adjmatsq)) {
-      for (j in 1:ncol(gnet_adjmatsq)) {
-        if(gnet_adjmatsq[i,j] == 1) {
-          newtri_conns <- append(newtri_conns, list(c(i,j)))
-        }
-      }
-    } # end nested for loop corner case
-
-  } else { # "normal" case
-
-    for(i in 1:nrow(gnet_adjmatsq)) {
-      for (j in 1:ncol(gnet_adjmatsq)) {
-        if(gnet_adjmatsq[i,j] == 2) {
-          newtri_conns <- append(newtri_conns, list(c(i,j)))
-        }
-      }
-    } # end nested for loop
-  } # end if/else corner case catch
+  # do nodes i,j share a common neighbor
+  #   common neighbors mean potential for transitivity
+  newijs <- which(gnet_adjmatsq > 0)
+  i <- newijs %% nrow(gnet_adjmatsq) # identify ij based on R order vector from matrix
+  i <- ifelse(i == 0, nrow(gnet_adjmatsq), i)
+  j <- ceiling( newijs /ncol(gnet_adjmatsq) )
+  newtri_conns <- mapply(function(x,y){return(c(x,y))},
+                         x = i, y = j, SIMPLIFY = FALSE)
 
   #......................
   # out
@@ -278,42 +330,93 @@ get_potential_triangle_edges <- function(graph_network) {
 }
 
 
-#' @title Add New Edges to Induce Clustering (Triangles)
+#' @title Add or Remove Edges to Change Clustering (Triangles)
 #' @inheritParams manip_degdist
-#' @param edge_add_num int; Number of edges to add
-#' @description Identify a subset of dyad pairs that could have a new edge
-#' introduced between them to induce a cluster, or new triangle.
-#' @details Adds edges sequentially based on node numbering
+#' @param new_transitivity_prob numeric; The probability that adjacent vertices of a
+#' node are connected (i.e. the clustering coefficient)
+#' @description Method for adding or removing edges to change the probability of transitivity,
+#' or clustering coefficient, of the current graph
+#' @details In cases were the desired probability of transitivity is greater than the
+#' current probability of transitivity, a subset of dyad pairs that could have a new edge
+#' introduced between them to induce a new triangle (cluster) are identified and created.
+#' In instances where the desired probability of transitivity is lower than the current,
+#' edges that make up triangles are removed.
 #' @importFrom PFSwDemonDanProphetBrown get_potential_triangle_edges
-#' @returns network graph (igraph class) with new triangle clusters
+#' @returns network graph (igraph class) with new clustering coefficient
 #' @export
 
-manip_clust_addedges <- function(graph_network, edge_add_num) {
+manip_clust_edges <- function(graph_network, new_transitivity_prob) {
   #......................
   # checks
   #......................
   goodegg::assert_eq("igraph", class(graph_network),
                      message = "The graph_network object must be have the igraph class (i.e. generate network with igraph)")
-  goodegg::assert_single_int(edge_add_num)
+  goodegg::assert_single_numeric(new_transitivity_prob)
 
   #......................
   # setup (const, storage, etc)
   #......................
   new_graph_network <- graph_network
+  start_trans <- igraph::transitivity(graph_network)
   #......................
   # core
   #......................
-  potedges <- get_potential_triangle_edges(graph_network)
-  # catch
-  if (length(potedges) > edge_add_num) {
-    stop("You have requested to add more edges than there are potential dyad pairs.
-         Either submit a new graph network or decrease the number of requested
-         edges")
-  }
-  # add edges in place
-  for (i in 1:edge_add_num) {
-    new_graph_network <- igraph::add_edges(graph = new_graph_network,
-                                           edges = potedges[[i]])
+  # NB the number of triangles that we induce or remove will be not be a 1:1 correlation
+  # with edges removed due to interdependencies
+  # therefore, will loop through and calculate transitivity iteratively
+  # there is a potential to run out of edges to sample from (either in adding or removing) but have not added catch for that
+
+  if ( new_transitivity_prob > start_trans ) { # adding clusters
+    # identify edges that we could potentially add
+    pot_add_edges <- get_potential_triangle_edges(graph_network)
+
+    while( new_transitivity_prob > igraph::transitivity(new_graph_network) ) { # transitivity being updated iteratively, so needs to be called iteratively
+      #......................
+      # sampling efficiency yields approx transitivity, not exact
+      #......................
+      diffprob <- new_transitivity_prob - igraph::transitivity(new_graph_network)
+      nedge <- ceiling( diffprob * igraph::ecount(new_graph_network) )
+      new_edge_index <-  sample(1:length(pot_add_edges), size = nedge)
+      # pick edge to add and add it
+      new_edges <- unlist(pot_add_edges[ new_edge_index ])
+      new_graph_network <- igraph::add_edges(new_graph_network,
+                                             edges = new_edges)
+      # drop used edge
+      pot_add_edges <- pot_add_edges[!(1:length(pot_add_edges) %in% new_edge_index)]
+    } # end while
+  } else if (new_transitivity_prob < start_trans ) { # removing clusters
+    # identify edges that we could potentially remove
+    pot_rm_edges <- igraph::triangles(graph_network) # per igraph docs: For efficiency, all triangles are returned in a single vector. The first three vertices belong to the first triangle, etc.
+    # per igraph docs need to split this
+    pot_rm_edges <- igraph::as_ids(pot_rm_edges)
+    grps <- factor( sort(rep(1:(length(pot_rm_edges)/3), 3)) )
+    pot_rm_edges <- split(pot_rm_edges, f = grps)
+
+    while (new_transitivity_prob < igraph::transitivity(new_graph_network) ) {
+
+      #......................
+      # sampling efficiency yields approx transitivity, not exact
+      # but given dampening effect, should be close...
+      #......................
+      diffprob <- abs( new_transitivity_prob - igraph::transitivity(new_graph_network) )
+      nedge <- ceiling( diffprob * igraph::ecount(new_graph_network) )
+      del_edge_index <- sample(1:length(pot_add_edges), size = nedge)
+
+      # pick left to right vs right to left
+      if(rbinom(1)) {
+        pot_rm_edges[[del_edge_index]] <- paste(pot_rm_edges[[del_edge_index]][1:2], collapse = "|")
+      } else {
+        pot_rm_edges[[del_edge_index]] <- paste(pot_rm_edges[[del_edge_index]][2:3], collapse = "|")
+      }
+      # update graph
+      del_edge <- unlist(pot_rm_edges[del_edge_index])
+      new_graph_network <- igraph::delete_edges(new_graph_network,
+                                                edges = del_edge) # r a character vector containing the IDs or names of the source and target vertices, separated by |
+      # drop used edge
+      pot_rm_edges <- pot_rm_edges[!(1:length(pot_rm_edges) %in% del_edge_index)]
+    } # end while
+  } else {
+    next
   }
 
   #......................
@@ -327,9 +430,9 @@ manip_clust_addedges <- function(graph_network, edge_add_num) {
 #' @return igraph network
 #' @export
 
-wrapper_manip_clust_addedges <- function(basenetpath, edge_add_num) {
+wrapper_manip_clust_edges <- function(basenetpath, new_transitivity_prob) {
   grphnet <- readRDS(basenetpath)
-  out <- manip_clust_addedges(graph_network = grphnet,
-                              edge_add_num = edge_add_num)
+  out <- manip_clust_edges(graph_network = grphnet,
+                           new_transitivity_prob = new_transitivity_prob)
   return(out)
 }

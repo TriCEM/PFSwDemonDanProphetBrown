@@ -169,7 +169,12 @@ simout <- simmap %>%
   dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes,
                                      .progress = TRUE))
 
+simoutlite <- simout %>%
+  dplyr::mutate(simoutlite = purrr::map(simout, fomes::tidyout)) %>%
+  dplyr::select(-c("conmat", "simout"))
+
 #++++++++++++++++++++++++++++++++++++++++++
 ### Save        ####
 #++++++++++++++++++++++++++++++++++++++++++
 saveRDS(simout, file = paste0(opt$outdir, opt$output))
+saveRDS(simoutlite, file = paste0(opt$outdir, "lite", opt$output))

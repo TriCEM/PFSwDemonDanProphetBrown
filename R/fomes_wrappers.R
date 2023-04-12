@@ -166,8 +166,7 @@ wrap_sim_fomes <- function(mod, beta, durI, val, reps, conmat) {
 ### Run        ####
 #++++++++++++++++++++++++++++++++++++++++++
 simout <- simmap %>%
-  dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes,
-                                     .progress = TRUE))
+  dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes))
 
 simoutlite <- simout %>%
   dplyr::mutate(simoutlite = purrr::map(simout, fomes::tidyout)) %>%

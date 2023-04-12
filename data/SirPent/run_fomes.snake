@@ -42,6 +42,7 @@ rule all:
 
 rule run_simulation:
     output: "{outpath}"
+    log: OUTROOT + "logs/{outpath}.log"
     params:
         mod = lambda wildcards: sim_dict[wildcards.outpath]['network_manip'],
         betaI = lambda wildcards: sim_dict[wildcards.outpath]['betaI'],

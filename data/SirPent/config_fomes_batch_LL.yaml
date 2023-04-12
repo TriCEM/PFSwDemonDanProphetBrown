@@ -1,6 +1,5 @@
 # configuration for simulation runs
 
-logs: jobs
 tmpdir: .tmp
 threads: 6
 memory: 4

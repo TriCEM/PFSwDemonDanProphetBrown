@@ -148,7 +148,7 @@ dfmodularity <- dfmodularity %>%
 outdir <- "data/raw_data/modularity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfmodularity <- dfmodularity %>%
-  dplyr::rename(val = as.charcater(edge_rm_num)) %>%
+  dplyr::mutate(val = as.character(edge_rm_num)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
@@ -193,7 +193,7 @@ dfunity <- dfunity %>%
 outdir <- "data/raw_data/unity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfunity <- dfunity %>%
-  dplyr::rename(val = as.character(edge_add_num)) %>%
+  dplyr::mutate(val = as.character(edge_add_num)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),
@@ -239,7 +239,7 @@ dfclusted <- dfclusted %>%
 outdir <- "data/raw_data/cluster_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfclusted <- dfclusted %>%
-  dplyr::rename(val = as.character(new_transitivity_prob)) %>%
+  dplyr::mutate(val = as.character(new_transitivity_prob)) %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt),

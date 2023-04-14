@@ -5,5 +5,5 @@ threads: 6
 memory: 4
 
 simmap: /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/data/raw_data/maestro_map.tsv
-outdir: /pine/scr/n/f/nfb/Projects/PFSwDemonDanProphetBrown/data/derived_data/
+outdir: /work/users/n/f/nfb/Projects/PFSwDemonDanProphetBrown/data/derived_data/
 Rdir:  /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/

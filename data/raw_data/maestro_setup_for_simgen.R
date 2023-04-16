@@ -45,6 +45,21 @@ durIpath <- "data/raw_data/SIRparams/durIvals.RDS"
 saveRDS(betaI, file = betapath)
 saveRDS(durationI, file = durIpath)
 
+#..........
+# make Mass Action Model
+#..........
+outdir <- "data/raw_data/mass_action_network/"
+dir.create(outdir, recursive = T)
+maoupath <- paste0(outdir, "massactionnetwork.RDS")
+manet <- matrix(data = 1, nrow = N, ncol = N)
+diag(manet) <- 0
+saveRDS(manet, file = maoupath)
+massactiondf <- tibble::tibble(
+  network_manip = "massaction",
+  param = "ma",
+  val = as.character(0),
+  path = maoupath)
+
 #......................
 # STEP 1: generate 10 base networks
 #......................
@@ -80,7 +95,7 @@ maestro_dfbase <- tibble::tibble(
 #### Degree Distribution        ####
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid for degree distributions for homogenous and heterogenous variance
-degprobdist <- seq(0.1, 1, length.out = 10)
+degprobdist <- c(0.05, 0.1, 0.15, 0.2, 0.25)
 degvardist <- c(0, 1, 5, 10, 25, 50)
 dfdegdist <- expand.grid(basenetpaths, degprobdist, degvardist,
                                 stringsAsFactors = F) %>%
@@ -283,11 +298,9 @@ maestro_dfNEdyn <- expand.grid(basenetpaths, nexchange_rate,
 #++++++++++++++++++++++++++++++++++++++++++
 ### Bring Together       ####
 #++++++++++++++++++++++++++++++++++++++++++
-# sanity check
-ls()[ grepl(pattern = "maestro_*", ls()) ]
-
 # combine network rows
-maestro <- dplyr::bind_rows(maestro_dfbase,
+maestro <- dplyr::bind_rows(massactiondf,
+                            maestro_dfbase,
                             maestro_dfdegdist,
                             maestro_dfmodularity,
                             maestro_dfclusted,

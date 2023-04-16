@@ -89,11 +89,6 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
   curr_edges <- igraph::ecount(graph_network)
   new_edges <- round( new_degprob * (nodecount * (nodecount - 1) / 2 ))
   need_ed <- new_edges - curr_edges
-  # plan to manipulate in place
-  new_graph_network <- graph_network
-  # identify all potential edges
-  pot_edges <- igraph::simplify(igraph::complementer(graph_network))
-
 
   #......................
   # core
@@ -103,11 +98,12 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
                                         edge_delta = need_ed,
                                         new_degvar = new_degvar)
 
+  # identify all potential edges that we could add
+  pot_graph <- igraph::simplify(igraph::complementer(graph_network))
   # add or delete edges accordingly
   for (i in 1:length(node_degchanges)) {
-
     # identify edges with node of interest
-    edges_with_node <- igraph::incident(graph = pot_edges, v = i)
+    edges_with_node <- igraph::incident(graph = pot_graph, v = i)
     #......................
     # ADDING edges
     #......................
@@ -119,7 +115,8 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
         edges_to_add <- sample(x = edges_with_node, size = abs(node_degchanges[i]))
       }
       # class liftover
-      edges_to_add <- igraph::ends(pot_edges, edges_to_add)
+      edges_to_add <- igraph::ends(pot_graph, edges_to_add)
+      edges_to_add <- unlist(apply(edges_to_add, 1, as.vector, simplify = F))
       # make changes
       graph_network <- igraph::add_edges(graph = graph_network,
                                          edges = edges_to_add)
@@ -127,6 +124,9 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
       # Removing edges
       #......................
     } else if (node_degchanges[i] < 0) {
+      # don't need complement here, as we are removing existing edges
+      # identify edges with node of interest
+      edges_with_node <- igraph::incident(graph = graph_network, v = i)
       # catch if we need to rm more edges than is possible
       if (length(edges_with_node) < abs(node_degchanges[i])) {
         edges_to_rm <- edges_with_node
@@ -134,7 +134,8 @@ manip_degdist <- function(graph_network, new_degprob = 0.5,
         edges_to_rm <- sample(x = edges_with_node, size = abs(node_degchanges[i]))
       }
       # class liftover
-      edges_to_rm <- igraph::ends(pot_edges, edges_to_rm)
+      edges_to_rm <- igraph::ends(graph_network, edges_to_rm)
+      edges_to_rm <- apply(edges_to_rm, 1, function(x){paste(x, collapse = "|")})
       # make changes
       graph_network <- igraph::delete_edges(graph = graph_network,
                                             edges = edges_to_rm)

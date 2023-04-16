@@ -40,3 +40,7 @@ data/derived_data/
 # MAC files
 .DS_Store
 
+
+data/raw_data/mass_action_network/massactionnetwork.RDS
+
+workoutline.md

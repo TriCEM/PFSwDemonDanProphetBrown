@@ -8,7 +8,7 @@
 #' @inheritParams manip_degdist
 #' @param edge_delta integer; Number of edges to spread out
 #' @description Use a stick-breaking process from a beta distribution
-#' with alpha = 1 and beta = new_deg var
+#' with alpha = 1 and beta = new_degvar
 #' @importFrom truncnorm rtruncnorm
 #' @returns Vector of integers that correspond to edge changes
 #' @export

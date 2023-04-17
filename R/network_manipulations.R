@@ -369,11 +369,11 @@ manip_clust_edges <- function(graph_network, new_transitivity_prob) {
 
   if ( new_transitivity_prob > start_trans ) { # adding clusters
     # identify edges that we could potentially add
-    pot_add_edges <- get_potential_triangle_edges(graph_network)
+    pot_add_edges <- get_potential_triangle_edges(new_graph_network)
 
     while( new_transitivity_prob > igraph::transitivity(new_graph_network) ) { # transitivity being updated iteratively, so needs to be called iteratively
       #......................
-      # sampling efficiency yields approx transitivity, not exact
+      # self dampening --> sampling efficiency yields approx transitivity, not exact
       #......................
       diffprob <- new_transitivity_prob - igraph::transitivity(new_graph_network)
       nedge <- ceiling( diffprob * igraph::ecount(new_graph_network) )
@@ -386,14 +386,15 @@ manip_clust_edges <- function(graph_network, new_transitivity_prob) {
       pot_add_edges <- pot_add_edges[!(1:length(pot_add_edges) %in% new_edge_index)]
     } # end while
   } else if (new_transitivity_prob < start_trans ) { # removing clusters
-    # identify edges that we could potentially remove
-    pot_rm_edges <- igraph::triangles(graph_network) # per igraph docs: For efficiency, all triangles are returned in a single vector. The first three vertices belong to the first triangle, etc.
-    # per igraph docs need to split this
-    pot_rm_edges <- igraph::as_ids(pot_rm_edges)
-    grps <- factor( sort(rep(1:(length(pot_rm_edges)/3), 3)) )
-    pot_rm_edges <- split(pot_rm_edges, f = grps)
 
     while (new_transitivity_prob < igraph::transitivity(new_graph_network) ) {
+      # identify edges that we could potentially remove
+      # NB triangles can change as we remove edges (left vs right side of triangle)
+      pot_rm_edges <- igraph::triangles(new_graph_network) # per igraph docs: For efficiency, all triangles are returned in a single vector. The first three vertices belong to the first triangle, etc.
+      # per igraph docs need to split this
+      pot_rm_edges <- igraph::as_ids(pot_rm_edges)
+      grps <- factor( sort(rep(1:(length(pot_rm_edges)/3), 3)) )
+      pot_rm_edges <- split(pot_rm_edges, f = grps)
 
       #......................
       # sampling efficiency yields approx transitivity, not exact
@@ -401,13 +402,13 @@ manip_clust_edges <- function(graph_network, new_transitivity_prob) {
       #......................
       diffprob <- abs( new_transitivity_prob - igraph::transitivity(new_graph_network) )
       nedge <- ceiling( diffprob * igraph::ecount(new_graph_network) )
-      del_edge_index <- sample(1:length(pot_add_edges), size = nedge)
+      del_edge_index <- sample(1:length(pot_rm_edges), size = nedge)
 
       # pick left to right vs right to left
-      if(rbinom(1)) {
-        pot_rm_edges[[del_edge_index]] <- paste(pot_rm_edges[[del_edge_index]][1:2], collapse = "|")
+      if(rbinom(1,1,0.5)) {
+        pot_rm_edges[del_edge_index] <- lapply(pot_rm_edges[del_edge_index], function(x){paste(x[1:2], collapse = "|")})
       } else {
-        pot_rm_edges[[del_edge_index]] <- paste(pot_rm_edges[[del_edge_index]][2:3], collapse = "|")
+        pot_rm_edges[del_edge_index] <- lapply(pot_rm_edges[del_edge_index], function(x){paste(x[2:3], collapse = "|")})
       }
       # update graph
       del_edge <- unlist(pot_rm_edges[del_edge_index])

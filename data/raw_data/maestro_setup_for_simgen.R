@@ -53,6 +53,7 @@ dir.create(outdir, recursive = T)
 maoupath <- paste0(outdir, "massactionnetwork.RDS")
 manet <- matrix(data = 1, nrow = N, ncol = N)
 diag(manet) <- 0
+manet <- igraph::graph_from_adjacency_matrix(manet)
 saveRDS(manet, file = maoupath)
 massactiondf <- tibble::tibble(
   network_manip = "massaction",
@@ -96,7 +97,7 @@ maestro_dfbase <- tibble::tibble(
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid for degree distributions for homogenous and heterogenous variance
 degprobdist <- c(0.05, 0.1, 0.15, 0.2, 0.25)
-degvardist <- c(0, 1, 5, 10, 25, 50)
+degvardist <- c(0, 1, 5, 10, 25)
 dfdegdist <- expand.grid(basenetpaths, degprobdist, degvardist,
                                 stringsAsFactors = F) %>%
   magrittr::set_colnames(c("basenetpath", "degprob", 'degvar')) %>%
@@ -234,7 +235,7 @@ maestro_dfunity <- maestro_dfunity %>%
 #### Clustering       ####
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid to add edges between dyad pairs and make new clusters (triangles)
-clusted <- seq(from = 0.3, to = 0.75, by = 0.05)
+clusted <- c(0.01,seq(0.05, 0.25, by = 0.025))
 dfclusted <- expand.grid(basenetpaths, clusted,
                          stringsAsFactors = F) %>%
   magrittr::set_colnames(c("basenetpath", "new_transitivity_prob"))

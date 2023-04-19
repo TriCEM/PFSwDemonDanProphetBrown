@@ -34,8 +34,8 @@ N <- 1e3
 #......................
 # STEP 0: generate beta and duration of illness
 #......................
-betaI <- seq(0.05, 1, by = 0.05)
-durationI <- seq(2,50, by = 2)
+betaI <- seq(0.1, 1, by = 0.1)
+durationI <- seq(3, 30, by = 3)
 SIRoutpath <- "data/raw_data/SIRparams/"
 dir.create(SIRoutpath, recursive = T)
 #betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
@@ -305,9 +305,9 @@ maestro <- dplyr::bind_rows(massactiondf,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
 # bring in SIR params
-sirparams <- tibble::tibble(betaI = betapaths,
+sirparams <- tidyr::expand_grid(betaI = betapaths,
                             durationI = durationIpaths)
-expand_grid(sirparams, maestro, stringsAsFactors = F)
+# pseudo expand grid given lower lvls
 maestro <- tidyr::expand_grid(sirparams, maestro)
 
 # add in replicates/iterations

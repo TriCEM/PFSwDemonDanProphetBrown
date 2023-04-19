@@ -34,8 +34,8 @@ N <- 1e3
 #......................
 # STEP 0: generate beta and duration of illness
 #......................
-betaI <- seq(0.1, 1, by = 0.1)
-durationI <- seq(3, 30, by = 3)
+betaI <-seq(0.1, 1, by = 0.2)
+durationI <- seq(3, 30, by = 6)
 SIRoutpath <- "data/raw_data/SIRparams/"
 dir.create(SIRoutpath, recursive = T)
 #betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)

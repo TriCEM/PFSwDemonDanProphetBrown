@@ -317,7 +317,7 @@ maestro <- maestro %>%
 # add in outpath
 maestro_out <- maestro %>%
   dplyr::mutate(outpath = purrr::pmap_chr(., function(betaI, durationI, network_manip, param, val, reps, path){
-    paste0("SimRet_", network_manip, param, val, "-", sub(".RDS", "", basename(path)), "-reps", reps, ".RDS")}
+    paste0("SimRet_", "beta", betaI, "_dur", durationI, "_", network_manip, param, val, "-", sub(".RDS", "", basename(path)), "-reps", reps, ".RDS")}
   ))
 
 

@@ -54,7 +54,7 @@ rule run_simulation:
         Rdir = RROOT,
     shell:
         r"""
-        Rscript /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/R/fomes_wrappers_exec.R \
+        Rscript /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/R/fomes_wrappers_search_exec.R \
         --mod {params.mod} \
         --beta {params.betaI} \
         --dur {params.durationI} \

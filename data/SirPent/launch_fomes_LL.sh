@@ -10,7 +10,7 @@ snakemake \
 	--configfile $ROOT/data/SirPent/config_fomes_batch_LL.yaml \
 	--printshellcmds \
 	--directory $WD \
-	--cluster $ROOT/data/SirPent/launch_lite.py \
+	--cluster $ROOT/data/SirPent/launch_heavy.py \
 	-j $NODES \
 	--rerun-incomplete \
 	--keep-going \

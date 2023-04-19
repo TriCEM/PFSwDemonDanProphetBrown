@@ -1,9 +1,5 @@
 # configuration for simulation runs
 
-tmpdir: .tmp
-threads: 6
-memory: 12
-
 simmap: /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/data/raw_data/maestro_map.tsv
 outdir: /work/users/n/f/nfb/Projects/PFSwDemonDanProphetBrown/data/derived_data/
 Rdir:  /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/

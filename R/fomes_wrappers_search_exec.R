@@ -325,5 +325,7 @@ SAout <- adaptive_sim_anneal(maxIter = 100,
                              outdir = outdir,
                              output = output
                              )
+
+# note this is actually the chain
 saveRDS(SAout,
-        file = paste0(outdir, "SAchain-", output))
+        file = paste0(outdir, output))

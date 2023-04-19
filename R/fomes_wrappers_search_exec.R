@@ -107,8 +107,8 @@ opt <- parse_args(opt_parser)
 #++++++++++++++++++++++++++++++++++++++++++
 mod <- opt$mod
 val <- opt$val
-beta <- readRDS(paste0(opt$Rdir, opt$beta))
-durI <- readRDS(paste0(opt$Rdir, opt$dur))
+beta <- as.numeric(opt$beta)
+durI <- as.numeric(opt$dur)
 netgraph <- readRDS(paste0(opt$Rdir, opt$netpath))
 conmat <- igraph::as_adjacency_matrix(netgraph, sparse = F)
 reps <- 1:opt$reps

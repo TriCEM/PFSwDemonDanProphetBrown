@@ -36,16 +36,9 @@ N <- 1e3
 #......................
 betaI <-seq(0.1, 1, by = 0.2)
 durationI <- seq(3, 30, by = 6)
-SIRoutpath <- "data/raw_data/SIRparams/"
-dir.create(SIRoutpath, recursive = T)
-#betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
-#durationI <- 5
-# save out beta for exportability w/ snakemake
-betapaths <- paste0(SIRoutpath, "beta_", betaI, ".RDS")
-mapply(function(x,y){saveRDS(x, file = y)}, x = betaI, y = betapaths)
-# save out dur for exportability w/ snakemake
-durationIpaths <- paste0(SIRoutpath, "durI_", durationI, ".RDS")
-mapply(function(x,y){saveRDS(x, file = y)}, x = durationI, y = durationIpaths)
+sirparams <- tidyr::expand_grid(betaI = betaI,
+                                durationI = durationI)
+
 
 #..........
 # make Mass Action Model
@@ -304,10 +297,8 @@ maestro <- dplyr::bind_rows(massactiondf,
                             maestro_dfunity,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
-# bring in SIR params
-sirparams <- tidyr::expand_grid(betaI = betapaths,
-                            durationI = durationIpaths)
-# pseudo expand grid given lower lvls
+
+# bring in SIR params and expand out
 maestro <- tidyr::expand_grid(sirparams, maestro)
 
 # add in replicates/iterations

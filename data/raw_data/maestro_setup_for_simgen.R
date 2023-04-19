@@ -34,16 +34,18 @@ N <- 1e3
 #......................
 # STEP 0: generate beta and duration of illness
 #......................
-#betaI <- seq(0.1, 1, length.out = 25)
-#durationI <- seq(2,50, by = 2)
-betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
-durationI <- 5
-# save out beta and duration for exportability w/ snakemake
-dir.create("data/raw_data/SIRparams/", recursive = T)
-betapath <- "data/raw_data/SIRparams/betavals.RDS"
-durIpath <- "data/raw_data/SIRparams/durIvals.RDS"
-saveRDS(betaI, file = betapath)
-saveRDS(durationI, file = durIpath)
+betaI <- seq(0.1, 1, length.out = 25)
+durationI <- seq(2,50, by = 2)
+SIRoutpath <- "data/raw_data/SIRparams/"
+dir.create(SIRoutpath, recursive = T)
+#betaI <- round(seq(0.1, 1, length.out = 10), digits = 1)
+#durationI <- 5
+# save out beta for exportability w/ snakemake
+betapaths <- paste0(SIRoutpath, "beta_", betaI, ".RDS")
+mapply(function(x,y){saveRDS(x, file = y)}, x = betaI, y = betapaths)
+# save out dur for exportability w/ snakemake
+durationIpaths <- paste0(SIRoutpath, "durI_", durationI, ".RDS")
+mapply(function(x,y){saveRDS(x, file = y)}, x = durationI, y = durationIpaths)
 
 #..........
 # make Mass Action Model
@@ -98,8 +100,7 @@ maestro_dfbase <- tibble::tibble(
 # expand out grid for degree distributions for homogenous and heterogenous variance
 degprobdist <- c(0.05, 0.1, 0.15, 0.2, 0.25)
 degvardist <- c(0, 1, 5, 10, 25)
-dfdegdist <- expand.grid(basenetpaths, degprobdist, degvardist,
-                                stringsAsFactors = F) %>%
+dfdegdist <- tidyr::expand_grid(basenetpaths, degprobdist, degvardist) %>%
   magrittr::set_colnames(c("basenetpath", "degprob", 'degvar')) %>%
   tibble::as_tibble()
 
@@ -145,8 +146,7 @@ maestro_dfdegdist <- maestro_dfdegdist %>%
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid for edges to remove to make modular communities
 edgedrop <- c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000)
-dfmodularity <- expand.grid(basenetpaths, edgedrop,
-                            stringsAsFactors = F) %>%
+dfmodularity <- tidyr::expand_grid(basenetpaths, edgedrop) %>%
   magrittr::set_colnames(c("basenetpath", "edge_rm_num"))
 
 
@@ -191,8 +191,7 @@ maestro_dfmodularity <- maestro_dfmodularity %>%
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid for edges to remove to make modular communities
 edgeadd <- c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000)
-dfunity <- expand.grid(basenetpaths, edgeadd,
-                       stringsAsFactors = F) %>%
+dfunity <- tidyr::expand_grid(basenetpaths, edgeadd) %>%
   magrittr::set_colnames(c("basenetpath", "edge_add_num"))
 
 #......................
@@ -236,8 +235,7 @@ maestro_dfunity <- maestro_dfunity %>%
 #++++++++++++++++++++++++++++++++++++++++++
 # expand out grid to add edges between dyad pairs and make new clusters (triangles)
 clusted <- c(0.01,seq(0.05, 0.25, by = 0.025))
-dfclusted <- expand.grid(basenetpaths, clusted,
-                         stringsAsFactors = F) %>%
+dfclusted <- tidyr::expand_grid(basenetpaths, clusted) %>%
   magrittr::set_colnames(c("basenetpath", "new_transitivity_prob"))
 
 
@@ -283,8 +281,7 @@ maestro_dfclusted <- maestro_dfclusted %>%
 nexchange_rate <- sapply(seq(9, 0), function(x){10^(-x)})
 # this function will capitalize on the internal functionality of `fomes` and
 # does not need a static network manipulation as above
-maestro_dfNEdyn <- expand.grid(basenetpaths, nexchange_rate,
-                               stringsAsFactors = F) %>%
+maestro_dfNEdyn <- tidyr::expand_grid(basenetpaths, nexchange_rate) %>%
   magrittr::set_colnames(c("path", "val")) %>%
   dplyr::mutate(network_manip = "NEdynamicity",
                 param = "exchrate",
@@ -304,12 +301,14 @@ maestro <- dplyr::bind_rows(massactiondf,
                             maestro_dfbase,
                             maestro_dfdegdist,
                             maestro_dfmodularity,
+                            maestro_dfunity,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
 # bring in SIR params
-sirparams <- tibble::tibble(betaI = betapath,
-                            durationI = durIpath)
-maestro <- dplyr::bind_cols(sirparams, maestro)
+sirparams <- tibble::tibble(betaI = betapaths,
+                            durationI = durationIpaths)
+expand_grid(sirparams, maestro, stringsAsFactors = F)
+maestro <- tidyr::expand_grid(sirparams, maestro)
 
 # add in replicates/iterations
 maestro <- maestro %>%

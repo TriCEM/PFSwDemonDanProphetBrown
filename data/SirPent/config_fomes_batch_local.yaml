@@ -1,0 +1,5 @@
+# configuration for simulation runs
+
+root: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/
+simmap: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/data/raw_data/maestro_map_test.tsv
+outdir: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/data/derived_data/

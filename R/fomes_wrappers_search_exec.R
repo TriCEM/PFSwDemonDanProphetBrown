@@ -47,79 +47,14 @@ library(tibble)
 library(magrittr)
 
 #++++++++++++++++++++++++++++++++++++++++++
-### parse CL inputs     ####
+### Functions        ####
 #++++++++++++++++++++++++++++++++++++++++++
-option_list=list(
-
-  make_option(c("-m", "--mod"),
-              type = "character", default = NULL,
-              help = paste("Model type"),
-              metavar = "character"),
-
-
-  make_option(c("-b", "--betaI"),
-              type = "character", default = NULL,
-              help = paste("File path for beta values to iterate over"),
-              metavar = "character"),
-
-  make_option(c("-d", "--dur"),
-              type = "character", default = NULL,
-              help = paste("File path for duration of infection values to iterate over"),
-              metavar = "character"),
-
-  make_option(c("-n", "--netpath"),
-              type = "character", default = NULL,
-              help = paste("File path for network to consider"),
-              metavar = "character"),
-
-  make_option(c("-v", "--val"),
-              type = "numeric", default = NULL,
-              help = paste("Value of NE for specific Gillespie SIR-NE Model Simulation"),
-              metavar = "character"),
-
-  make_option(c("-r", "--reps"),
-              type = "integer", default = NULL,
-              help = paste("Number of reps to consider"),
-              metavar = "character"),
-
-  make_option(c("-o", "--output"),
-              type = "character", default = NULL,
-              help = paste("Output filename to write result of Gillespie SIR-NE Model Simulation"),
-              metavar = "character"),
-
-  make_option(c("-x", "--outdir"),
-              type = "character", default = NULL,
-              help = paste("Output directory to write result of Gillespie SIR-NE Model Simulation"),
-              metavar = "character"),
-
-  make_option(c("-s", "--Rdir"),
-              type = "character", default = NULL,
-              help = paste("Root directory of R project"),
-              metavar = "character")
-
-)
-
-opt_parser <- OptionParser(option_list = option_list)
-opt <- parse_args(opt_parser)
-
 #++++++++++++++++++++++++++++++++++++++++++
-### Unpack from CL        ####
+#### Fomes Wrapper Function        #####
 #++++++++++++++++++++++++++++++++++++++++++
-mod <- opt$mod
-val <- opt$val
-beta <- as.numeric(opt$beta)
-durI <- as.numeric(opt$dur)
-netgraph <- readRDS(paste0(opt$Rdir, opt$netpath))
-conmat <- igraph::as_adjacency_matrix(netgraph, sparse = F)
-reps <- 1:opt$reps
-output <- opt$output
-outdir <- opt$outdir
-
-#++++++++++++++++++++++++++++++++++++++++++
-### Fomes Wrapper Function        ####
-#++++++++++++++++++++++++++++++++++++++++++
-wrap_sim_fomes <- function(mod, beta, durI, val, reps, conmat) {
-
+wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat) {
+  # set seed
+  set.seed(seed)
   #......................
   # setup (const, storage, etc)
   #......................
@@ -158,7 +93,7 @@ wrap_sim_fomes <- function(mod, beta, durI, val, reps, conmat) {
 
 
 #++++++++++++++++++++++++++++++++++++++++++
-### Adaptive Simulated Annealer Functions ####
+#### Adaptive Simulated Annealer Functions #####
 #++++++++++++++++++++++++++++++++++++++++++
 #' @title Cost
 #' @param
@@ -166,37 +101,10 @@ wrap_sim_fomes <- function(mod, beta, durI, val, reps, conmat) {
 #' @details
 #' @returns
 #' @export
-cost <- function(mod, beta, durI, val, reps, conmat,
-                 outdir, output, itername){
-
-  #......................
-  # Running on SimMap
-  #......................
-  simmap <- tidyr::expand_grid(mod, beta, durI, val, reps) %>%
-    dplyr::mutate(conmat = list(conmat)) %>%
-    magrittr::set_colnames(c("mod", "beta", "durI", "val", "rep", "conmat"))
-  simout <- simmap %>%
-    dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes))
-  simoutlite <- simout %>%
-    dplyr::mutate(simoutlite = purrr::map(simout, fomes::tidyout)) %>%
-    dplyr::select(-c("conmat", "simout"))
-
-  #......................
-  # Save Every Run
-  # this is not being returned in scope of the function
-  #......................
-  saveRDS(simout, file = paste0(outdir, "SAiter", itername, "-", output))
-  saveRDS(simoutlite, file = paste0(outdir, "lite-SAiter", itername, "-", output))
-
-  #......................
-  # CALC COST
-  #......................
-  costvec <- simoutlite %>%
-    dplyr::mutate(finalsize = purrr::map_dbl(simoutlite, "FinalEpidemicSize")) %>%
-    dplyr::pull(finalsize)
-  costvar <- 1/var(costvec)
-  return(costvar)
+cost <- function(finalsizes) {
+  return(1/var(finalsizes))
 }
+
 
 
 #' @title Propose
@@ -224,13 +132,22 @@ proposal <- function(currB, currD, iters) {
 #' @param
 #' @description
 #' @details Note, in scope behavior of writing out functions
-#' @returns
+#' @returns Tibble: NB, the chain is the simulated annealing accepted chain versus the "all"
+#' which contain the proposed values (whether or not they were accepted)
 #' @export
 
 
-adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, initTemp = 1,
+adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Temp = 1,
                                 mod, beta, durI, val, reps, conmat,
                                 outdir, output) {
+  #......................
+  ### Call Seed for Reproducibility
+  #......................
+  RNGkind(sample.kind = "Rounding")
+  # each beta, dur, and network will have it's own set of #rep independent seed
+  seeds <- sample(1:1e6, size = (maxIter * reps), replace = F)
+  # split up by reps
+  seedrun <- split(seeds, factor(sort(rep(1:maxIter, times = reps))))
   #......................
   # checks
   #......................
@@ -239,30 +156,70 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, ini
   #......................
   # setup (const, storage, etc)
   #......................
-  costrun <- rep(NA, maxIter)
+  costall <- rep(NA, maxIter)
+  costchain <- rep(NA, maxIter)
   temprun <- rep(NA, maxIter)
-  betarun <- rep(NA, maxIter)
-  durIrun <- rep(NA, maxIter)
-  Temp <- initTemp
-  currcost <- cost(mod = mod, beta = beta, durI = durI,
-                   val = val, reps = reps, conmat = conmat,
-                   outdir = outdir, output = output, itername = 0)
+  betaall <- rep(NA, maxIter)
+  betachain <- rep(NA, maxIter)
+  durIall <- rep(NA, maxIter)
+  durIchain <- rep(NA, maxIter)
+  SimOutRun <- lapply(1:maxIter, function(x){return(NULL)})
+  reps <- 1:reps
+
+  #......................
+  # init
+  #......................
+  initTemp <- Temp # store initial temp for reignition
+  i <- 1
+  simmap <- tidyr::expand_grid(mod, val, reps) %>%
+    dplyr::mutate(beta = beta, # for c/w below code
+                  durI = durI,
+                  seed = seedrun[[i]],
+                  conmat = list(conmat))
+  simout <- simmap %>%
+    dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes))
+  finalsize <- simout %>%
+    dplyr::mutate(simoutlite = purrr::map(simout, fomes::tidyout)) %>%
+    dplyr::mutate(finalsize = purrr::map_dbl(simoutlite, "FinalEpidemicSize")) %>%
+    dplyr::pull(finalsize)
+  currcost <- cost(finalsize)
   currpos <- c(beta, durI)
+  # store initial
+  costchain[1] <- costall[1] <- currcost # init is same for chain and accept
+  temprun[1] <- Temp
+  betachain[1] <- betaall[1] <- currpos[1]
+  durIchain[1] <- durIall[1] <- currpos[2]
+  SimOutRun[[1]] <- finalsize
+
   #......................
   # core
   # NB, must make an interactive for loop with while loop because vector allocation prespecified
   #......................
-  srch <- TRUE
-  i <- 1
-  while(srch) {
+  for (i in 2:maxIter){ # R 1 based and we init above
     # PROPOSE
     newpos <- proposal(currB = currpos[1],
                        currD = currpos[2],
                        iters = Iters)
     # CALC COST
-    newcost <- cost(mod = mod, beta = newpos[1], durI = newpos[2],
-                    val = val, reps = reps, conmat = conmat,
-                    outdir = outdir, output =  output, itername = i)
+    simmap <- tidyr::expand_grid(mod, val, reps) %>%
+      dplyr::mutate(beta = newpos[1],
+                    durI = newpos[2],
+                    seed = seedrun[[i]],
+                    conmat = list(conmat))
+    simout <- simmap %>%
+      dplyr::mutate(simout = purrr::pmap(., wrap_sim_fomes))
+    finalsize <- simout %>%
+      dplyr::mutate(simoutlite = purrr::map(simout, fomes::tidyout)) %>%
+      dplyr::mutate(finalsize = purrr::map_dbl(simoutlite, "FinalEpidemicSize")) %>%
+      dplyr::pull(finalsize)
+    newcost <- cost(finalsize)
+
+    # update ALL
+    costall[i] <- newcost
+    betaall[i] <- currpos[1]
+    durIall[i] <- currpos[2]
+    SimOutRun[[i]] <- finalsize
+
     # ACCEPT MOVE?
     u <- runif(1)
     p <- min( exp(-(newcost-currcost))/Temp, 1 )
@@ -272,7 +229,7 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, ini
     # update current position and cost
     currpos <- if(accept){newpos}else{currpos}
     currcost <- if(accept){newcost}else{currcost}
-    # Increase temperature if we move from local minima to a new potentially better area
+    # REIGNITE: Increase temperature if we move from local minima to a new potentially better area
     # DAMPENING: update temp with slow decrease: https://towardsdatascience.com/optimization-techniques-simulated-annealing-d6a4785a1de7
     if (accept) { # dynamically increase search and reignite temp
       Iters <- Iters + AddOnIters
@@ -281,51 +238,162 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, ini
       Temp <- Temp/(1 + Temp*coolingB)
     }
     # STORAGE items
-    costrun[i] <- currcost
+    costchain[i] <- currcost
     temprun[i] <- Temp
-    betarun[i] <- currpos[1]
-    durIrun[i] <- currpos[2]
-    # DETERMINE SEARCH
-    if (i == maxIter) {
-      srch <- FALSE
-    } else if (i == Iters) {
-      srch <- FALSE
+    betachain[i] <- currpos[1]
+    durIchain[i] <- currpos[2]
+
+    # DETERMINE SEARCH, stop if we hit iters mark and are done reigniting
+    if (i == Iters) {
+      break
     }
-    # update i
-    i <- i+1
   }
 
   #......................
   # out
   #......................
-  out <- list(
-    costrun = costrun[!is.na(costrun)],
-    temprun = temprun[!is.na(temprun)],
-    betarun = betarun[!is.na(betarun)],
-    durIrun = durIrun[!is.na(durIrun)]
-  )
+  seedrun <- seedrun[1:min(Iters, maxIter)]   # drop since we autofilled seeds
+  SimOutFinSz <- SimOutRun[!unlist(lapply(SimOutRun, is.null))]
+  # bring together in tibble
+  out <- tibble::tibble(
+    costall = costall,
+    costchain = costchain,
+    temp = temprun,
+    betaall = betaall,
+    betachain = betachain,
+    durIall = durIall,
+    durIchain = durIchain) %>%
+    dplyr::filter(!is.na(costall)) # drop if we don't get to max iters
+
+  out$seed <- seedrun
+  out$finalsize <- SimOutFinSz
   return(out)
 }
 
 
+
+
+#++++++++++++++++++++++++++++++++++++++++++
+### Command Line     ####
+#++++++++++++++++++++++++++++++++++++++++++
+#++++++++++++++++++++++++++++++++++++++++++
+#### parse CL inputs     #####
+#++++++++++++++++++++++++++++++++++++++++++
+option_list=list(
+
+  make_option(c("-m", "--mod"),
+              type = "character", default = NULL,
+              help = paste("Model type"),
+              metavar = "character"),
+
+
+  make_option(c("-p", "--SIRParams"),
+              type = "character", default = NULL,
+              help = paste("File path for transmission param values to iterate over"),
+              metavar = "character"),
+
+  make_option(c("-n", "--netpath"),
+              type = "character", default = NULL,
+              help = paste("File path for network to consider"),
+              metavar = "character"),
+
+  make_option(c("-v", "--val"),
+              type = "numeric", default = NULL,
+              help = paste("Value of NE for specific Gillespie SIR-NE Model Simulation"),
+              metavar = "character"),
+
+  make_option(c("-r", "--reps"),
+              type = "integer", default = NULL,
+              help = paste("Number of reps to consider"),
+              metavar = "character"),
+
+  make_option(c("-o", "--output"),
+              type = "character", default = NULL,
+              help = paste("Output filename to write result of Gillespie SIR-NE Model Simulation"),
+              metavar = "character"),
+
+  make_option(c("-x", "--outdir"),
+              type = "character", default = NULL,
+              help = paste("Output directory to write result of Gillespie SIR-NE Model Simulation"),
+              metavar = "character"),
+
+  make_option(c("-s", "--Rdir"),
+              type = "character", default = NULL,
+              help = paste("Root directory of R project"),
+              metavar = "character"),
+
+  make_option(c("-z", "--maxIter"),
+              type = "integer", default = NULL,
+              help = paste("Max iters for adaptive simulated annealing search"),
+              metavar = "character"),
+
+  make_option(c("-i", "--Iters"),
+              type = "integer", default = NULL,
+              help = paste("Start iters for adaptive simulated annealing search"),
+              metavar = "character"),
+
+  make_option(c("-a", "--AddOnIters"),
+              type = "integer", default = NULL,
+              help = paste("Additional iters to add for adaptive simulated annealing search"),
+              metavar = "character"),
+
+  make_option(c("-c", "--coolingB"),
+              type = "numeric", default = NULL,
+              help = paste("Cooling factor for slow decrease in adaptive simulated annealing"),
+              metavar = "character"),
+
+  make_option(c("-t", "--Temperature"),
+              type = "numeric", default = NULL,
+              help = paste("Initial temperature for adaptive simulated annealing"),
+              metavar = "character")
+)
+
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+
+#++++++++++++++++++++++++++++++++++++++++++
+#### Unpack from CL        #####
+#++++++++++++++++++++++++++++++++++++++++++
+mod <- opt$mod
+val <- opt$val
+sirparams <- readRDS(paste0(opt$Rdir, opt$SIRParams))
+netgraph <- readRDS(paste0(opt$Rdir, opt$netpath))
+conmat <- igraph::as_adjacency_matrix(netgraph, sparse = F)
+reps <- opt$reps
+output <- opt$output
+outdir <- opt$outdir
+maxIter <- opt$maxIter
+Iters <-opt$Iters
+AddOnIters <-opt$AddOnIters
+coolingB <- opt$coolingB
+Temp <- opt$Temperature
+
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung ####
 #++++++++++++++++++++++++++++++++++++++++++
-SAout <- adaptive_sim_anneal(maxIter = 100,
-                             Iters = 25,
-                             AddOnIters = 5,
-                             coolingB = 1e-3,
-                             initTemp = 1,
-                             mod = mod,
-                             beta = beta,
-                             durI = durI,
-                             val = val,
-                             reps = reps,
-                             conmat = conmat,
-                             outdir = outdir,
-                             output = output
-                             )
+Start <- Sys.time()
+SAmaestro <- sirparams %>%
+  dplyr::rename(beta = betaI,
+                durI = durationI) %>%
+  dplyr::mutate(maxIter = maxIter,
+                Iters = Iters,
+                AddOnIters = AddOnIters,
+                coolingB = coolingB,
+                Temp = Temp,
+                mod = mod,
+                val = val,
+                reps = reps,
+                conmat = list(conmat),
+                outdir = outdir,
+                output = output) %>%
+  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal,
+                                    .progress = TRUE))
+Sys.time() - Start
+# tidy up
+SAmaestro <- SAmaestro %>%
+  dplyr::select(c("beta", "durI", "SAout")) %>%
+  dplyr::mutate(net = opt$netpath)
 
-# note this is actually the chain
-saveRDS(SAout,
+saveRDS(SAmaestro,
         file = paste0(outdir, output))

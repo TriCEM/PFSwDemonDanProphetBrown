@@ -22,8 +22,8 @@ N <- 1e3
 ### Maestro Setup                      ####
 #++++++++++++++++++++++++++++++++++++++++++
 # Based on discussion want to have the following structure:
-#  * 25 beta values
-#  * 25 duration of illness
+#  * 5 beta values
+#  * 5 duration of illness
 #  * 10 "base" ER networks that will be adjusted by network mechanisms (default is p = 0.3)
 #    * Network mechanisms:
 #      * 10 * 5 degree distributions
@@ -33,13 +33,16 @@ N <- 1e3
 
 #......................
 # STEP 0: generate beta and duration of illness
+# save these out for later call and expansion for snakemake
+# separating this out for optimal batching
 #......................
 betaI <-seq(0.1, 1, by = 0.2)
-durationI <- seq(3, 30, by = 6)
+durationI <- seq(3, 15, by = 3)
 sirparams <- tidyr::expand_grid(betaI = betaI,
                                 durationI = durationI)
-
-
+SIRpath <- "data/raw_data/SIRparams/sirparam_vals.RDS"
+dir.create(sub("sirparam_vals.RDS", "", SIRpath), recursive = T)
+saveRDS(sirparams, SIRpath)
 #..........
 # make Mass Action Model
 #..........
@@ -298,17 +301,11 @@ maestro <- dplyr::bind_rows(massactiondf,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
 
-# bring in SIR params and expand out
-maestro <- tidyr::expand_grid(sirparams, maestro)
-
-# add in replicates/iterations
-maestro <- maestro %>%
-  dplyr::mutate(reps = 1e2)
-
 # add in outpath
 maestro_out <- maestro %>%
-  dplyr::mutate(outpath = purrr::pmap_chr(., function(betaI, durationI, network_manip, param, val, reps, path){
-    paste0("SimRet_", "beta", betaI, "_dur", durationI, "_", network_manip, param, val, "-", sub(".RDS", "", basename(path)), "-reps", reps, ".RDS")}
+  dplyr::mutate(SIRParampath = SIRpath) %>%
+  dplyr::mutate(outpath = purrr::pmap_chr(., function(SIRParampath, network_manip, param, val, path){
+    paste0("SimRet_", network_manip, param, val, "-", sub(".RDS", "", basename(path)),".RDS")}
   ))
 
 

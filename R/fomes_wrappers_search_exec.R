@@ -387,8 +387,7 @@ SAmaestro <- sirparams %>%
                 conmat = list(conmat),
                 outdir = outdir,
                 output = output) %>%
-  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal,
-                                    .progress = TRUE))
+  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
 Sys.time() - Start
 # tidy up
 SAmaestro <- SAmaestro %>%

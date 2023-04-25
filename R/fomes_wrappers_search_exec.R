@@ -104,7 +104,7 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat) {
 cost <- function(finalsizes) {
   cst <- 1/var(finalsizes)
   if (is.infinite(cst)) {
-    cst <- 1e10 # this is 1/1e-10 which is near the vector limit for R and its ability to calculate variance
+    cst <- 1e10 # this is 1/1e-10 which is near the vector limit for R and its ability to calculate variance: `var(c(rep(0,1e9),1))`
   }
   return(cst)
 }
@@ -147,7 +147,7 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
   #......................
   ### Call Seed for Reproducibility
   #......................
-  RNGkind(sample.kind = "Rounding")
+  suppressWarnings(RNGkind(sample.kind = "Rounding") ) # suppress warning from RNG for strict snakemake bash mode
   # each beta, dur, and network will have it's own set of #rep independent seed
   seeds <- sample(1:1e6, size = (maxIter * reps), replace = F)
   # split up by reps

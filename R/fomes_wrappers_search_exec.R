@@ -102,7 +102,11 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat) {
 #' @returns
 #' @export
 cost <- function(finalsizes) {
-  return(1/var(finalsizes))
+  cst <- 1/var(finalsizes)
+  if (is.infinite(cst)) {
+    cst <- 1e10 # this is 1/1e-10 which is near the vector limit for R and its ability to calculate variance
+  }
+  return(cst)
 }
 
 
@@ -230,12 +234,12 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
     currpos <- if(accept){newpos}else{currpos}
     currcost <- if(accept){newcost}else{currcost}
     # REIGNITE: Increase temperature if we move from local minima to a new potentially better area
-    # DAMPENING: update temp with slow decrease: https://towardsdatascience.com/optimization-techniques-simulated-annealing-d6a4785a1de7
+    # DAMPENING: update temp with exponential decay function
     if (accept) { # dynamically increase search and reignite temp
       Iters <- Iters + AddOnIters
       Temp <- max(Temp, initTemp * (1 - i/maxIter))
     } else {
-      Temp <- Temp/(1 + Temp*coolingB)
+      Temp <- Temp * exp(-coolingB * i)
     }
     # STORAGE items
     costchain[i] <- currcost

@@ -2,9 +2,11 @@
 ## Purpose: Wrapper script for running fomes from command line
 ##
 ## Author: Nick Brazeau
-##
-## Notes:
 ## .................................................................................
+# Temporarily suppress warning from RNG and "expect" val to be numeric for strict snakemake bash mode
+defaultwarnings <- getOption("warn")
+options(warn = -1)
+
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### dependencies     ####
@@ -145,17 +147,30 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
                                 mod, beta, durI, val, reps, conmat,
                                 outdir, output) {
   #......................
+  # checks
+  #......................
+  goodegg::assert_single_int(maxIter)
+  goodegg::assert_single_int(Iters)
+  goodegg::assert_single_int(AddOnIters)
+  goodegg::assert_single_numeric(coolingB)
+  goodegg::assert_single_numeric(Temp)
+  goodegg::assert_single_string(mod)
+  goodegg::assert_single_numeric(beta)
+  goodegg::assert_single_numeric(durI)
+  goodegg::assert_single_string(val)
+  goodegg::assert_single_int(reps)
+  goodegg::assert_square_matrix(conmat)
+  goodegg::assert_single_string(outdir)
+  goodegg::assert_single_string(output)
+
+  #......................
   ### Call Seed for Reproducibility
   #......................
-  suppressWarnings(RNGkind(sample.kind = "Rounding") ) # suppress warning from RNG for strict snakemake bash mode
+  RNGkind(sample.kind = "Rounding")
   # each beta, dur, and network will have it's own set of #rep independent seed
   seeds <- sample(1:1e6, size = (maxIter * reps), replace = F)
   # split up by reps
   seedrun <- split(seeds, factor(sort(rep(1:maxIter, times = reps))))
-  #......................
-  # checks
-  #......................
-  #goodegg::assert
 
   #......................
   # setup (const, storage, etc)
@@ -400,3 +415,6 @@ SAmaestro <- SAmaestro %>%
 
 saveRDS(SAmaestro,
         file = paste0(outdir, output))
+
+# turn warnings back to default
+options(warn = defaultwarnings)

@@ -141,8 +141,8 @@ adaptive_sim_anneal <- function(Initi, Initj, Boundi, Boundj, landscape,
 out <- adaptive_sim_anneal(Initi = 1, Initj = 1,
                            Boundi = paramdim, Boundj = paramdim,
                            landscape = poor_landscape,
-                           maxIter = 1e4,
-                           Iters = 1e3,
+                           maxIter = 1e3,
+                           Iters = 1e2,
                            AddOnIters = 1e1,
                            coolingB = 1e-3, initTemp = 1)
 length(out$costrun)
@@ -158,24 +158,31 @@ j <- sort(rep(1:1001, 1001))
 val <- as.vector(poor_landscape)
 # landscape
 landscapeplotdf <- tibble::tibble(i = i, j = j, val = val)
+# add init
+initdf <- tibble::tibble(rep = 0, i  = 1, j = 1, temp = 1, cost = NA)
+
 # search
 searchdf <- tibble::tibble(rep = 1:length(out$temprun),
                            i = out$irun,
-                           iend = lag(out$irun),
                            j = out$jrun,
-                           jend = lag(out$jrun),
                            temp = out$temprun,
-                           cost = out$costrun) %>%
-  dplyr::mutate(iend = ifelse(is.na(iend), 1, iend),
-                jend = ifelse(is.na(jend), 1, jend))
+                           cost = out$costrun)
+searchdf <- dplyr::bind_rows(initdf, searchdf)
+
+searchdf <- searchdf %>%
+  dplyr::mutate(iend = lead(i),
+                jend = lead(j))
 
 
+
+
+# plot
 plotObj <- ggplot() +
   geom_tile(data = landscapeplotdf,
             aes(x = i, y = j, fill = val)) +
   geom_segment(data = searchdf,
             aes(x = i, xend = iend, y = j, yend = jend,
-                color = temp, group = rep),
+                color = temp),
             alpha = 0.5, linewidth = 1,
             arrow = arrow(type = "closed",
                           ends = "first",

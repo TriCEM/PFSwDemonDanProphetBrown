@@ -1,0 +1,83 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Differentiating Mass Action and Degree Distribution
+In this section .... 
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, eval = T, results = 'hide',
+                      fig.align = 'center', fig.width = 8, fig.height = 8)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r}
+library(tidyverse)
+source("R/themes.R")
+```
+
+
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Munging        ####
+#++++++++++++++++++++++++++++++++++++++++++
+#......................
+# unpack data
+#......................
+simruns <- list.files("data/derived_data/", pattern = ".RDS", full.names = TRUE)
+simruns <- lapply(simruns, function(x){
+  ret <- readRDS(x)
+  ret <- ret %>% 
+    dplyr::mutate(outname = basename(x))
+  return(ret)
+  })
+simruns <- dplyr::bind_rows(simruns)
+
+#......................
+# TEMPORARY
+# TODO fix this munging once you haven't collated a billino strings
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(
+    net = stringr::str_replace(net, "b0", "base_0"),
+    mod = stringr::str_split_fixed(basename(net), "_", n = 4)[,1],
+    manip = stringr::str_split_fixed(basename(net), "_", n = 4)[,2],
+    val = stringr::str_split_fixed(basename(net), "_", n = 4)[,3],
+    bnet = stringr::str_split_fixed(basename(net), "_", n = 4)[,4],
+    bnet = stringr::str_replace(bnet, ".RDS", ""),
+    extraval = stringr::str_split_fixed(val, "-", n = 2)[,2], # deg dist
+    val = ifelse(stringr::str_detect(val, "-"), 
+                 stringr::str_split_fixed(val, "-", n = 2)[,1],
+                 val),
+    val = as.numeric(val),
+    extraval = as.numeric(extraval))
+
+
+#......................
+# add in Transmission Probability
+# T = 1 - e^(- \beta * \frac{1}{\gamma})
+# Newman 2002
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(TransProb = 1 - exp(- beta * durI))
+
+#......................
+# Factorize Bnet
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(BaseNet = factor(bnet, levels = 1:10, labels = paste0("Net", 1:10)))
+
+
+
+#......................
+# split up data 
+# have to do this manually given different graphs later
+#......................
+massactionsim <- simruns %>% 
+  dplyr::filter(mod == "massaction")
+
+
+
+```

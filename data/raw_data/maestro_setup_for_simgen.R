@@ -64,7 +64,7 @@ massactiondf <- tibble::tibble(
 #......................
 outdir <- "data/raw_data/base_networks/"
 dir.create(outdir, recursive = T)
-basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_b0_", x, ".RDS"))
+basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_0_", x, ".RDS"))
 
 # create networks with igraph degree sequence game
 base_networks <- replicate(10,
@@ -305,7 +305,7 @@ maestro <- dplyr::bind_rows(massactiondf,
 maestro_out <- maestro %>%
   dplyr::mutate(SIRParampath = SIRpath) %>%
   dplyr::mutate(outpath = purrr::pmap_chr(., function(SIRParampath, network_manip, param, val, path){
-    paste0("SimRet_", network_manip, param, val, "-", sub(".RDS", "", basename(path)),".RDS")}
+    paste0("SimRet-", path)}
   ))
 
 

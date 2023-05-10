@@ -1,0 +1,440 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Stochastic Noise from Network Attributes
+In this section, we explore the network attributes that generate the greatest variation in the distribution of final sizes. To do so, we used a closed population, stochastic continuous-time agent-based SIR model implemented with the Gillespie algorithm and the [fomes](https://github.com/TriCEM/fomes) package with inputs for: $\beta$, $\gamma$, contact-network, population-size, initial number of infected. 
+
+For all simulations, population size was fixed at N = 1000. Initial seed infections were set at 1 (infect seed = 1).  We used an adaptive simulated annealing strategy to find the "phase transitions" in the epidemic, or the parameter space that maximized the variance in the final size distribution given a contact network. Initial values of $\beta$, or the probability of transmission/transmission coefficient given the contact via network were: `betaI <-seq(0.1, 1, by = 0.2)`. Similarly, initial values of $\gamma$, or the rate of recover ($\frac{1}{duration})$, were: `durationI <- seq(3, 15, by = 3)`.
+
+For contact network structure, we 10 base networks with the same degree sequence for each node (**degree = 50**). These base networks were then manipulated to have varying network characteristics: degree distribution (homogenous degree variance and heterogenous degree variance), modularity, clustering, and dynamicity. 
+
+
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, eval = T, results = 'hide',
+                      fig.align = 'center', fig.width = 8, fig.height = 8)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r}
+library(tidyverse)
+library(cowplot)
+source("R/themes.R")
+```
+
+
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Munging        ####
+#++++++++++++++++++++++++++++++++++++++++++
+#......................
+# unpack data
+#......................
+simruns <- list.files("data/derived_data/", pattern = ".RDS", full.names = TRUE)
+simruns <- lapply(simruns, function(x){
+  ret <- readRDS(x)
+  ret <- ret %>% 
+    dplyr::mutate(outname = basename(x))
+  return(ret)
+})
+simruns <- dplyr::bind_rows(simruns)
+
+#......................
+# TEMPORARY
+# TODO fix this munging once you haven't collated a billino strings
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(
+    net = stringr::str_replace(net, "b0", "base_0"),
+    mod = stringr::str_split_fixed(basename(net), "_", n = 4)[,1],
+    manip = stringr::str_split_fixed(basename(net), "_", n = 4)[,2],
+    val = stringr::str_split_fixed(basename(net), "_", n = 4)[,3],
+    bnet = stringr::str_split_fixed(basename(net), "_", n = 4)[,4],
+    bnet = stringr::str_replace(bnet, ".RDS", ""),
+    extraval = stringr::str_split_fixed(val, "-", n = 2)[,2], # deg dist
+    val = ifelse(stringr::str_detect(val, "-"), 
+                 stringr::str_split_fixed(val, "-", n = 2)[,1],
+                 val),
+    val = as.numeric(val),
+    extraval = as.numeric(extraval))
+
+#......................
+# catch NE 
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(
+    mod = ifelse(
+                stringr::str_detect(outname,"NEdynamicityexchrate"), 
+                "NE", 
+                mod
+              ),
+    val = ifelse(
+                stringr::str_detect(outname,"NEdynamicityexchrate"), 
+                as.numeric(stringr::str_extract(outname, "(?<=rate).*(?=-)")),
+                val
+              )
+    )
+
+
+#......................
+# add in Transmission Probability
+# T = 1 - e^(- \beta * \frac{1}{\gamma})
+# Newman 2002
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(TransProb = 1 - exp(- beta * durI))
+
+#......................
+# Factorize Bnet
+#......................
+simruns <- simruns %>% 
+  dplyr::mutate(BaseNet = factor(bnet, levels = 1:10, labels = paste0("Net", 1:10)))
+
+
+
+#......................
+# split up data 
+# have to do this manually given different graphs later
+#......................
+
+# base
+basesims <- simruns %>% 
+  dplyr::filter(mod == "base") %>% 
+  dplyr::select(-c("manip", "val", "extraval")) %>% 
+  tidyr::unnest(cols = SAout)
+
+# dd
+degreedistsims <- simruns %>% 
+  dplyr::filter(mod == "degreedist") %>% 
+  dplyr::rename(mean = val,
+                variance = extraval) %>% 
+  tidyr::unnest(cols = SAout)
+
+# cluster
+clustersims <- simruns %>% 
+  dplyr::filter(mod == "cluster") %>% 
+  dplyr::rename(clustercoef = val) %>% 
+  tidyr::unnest(cols = SAout)
+
+# modularity 
+modularitysims <- simruns %>% 
+  dplyr::filter(mod == "modularity") %>% 
+  dplyr::rename(dropedges = val) %>% 
+  tidyr::unnest(cols = SAout)
+
+# unity 
+unitysims <- simruns %>% 
+  dplyr::filter(mod == "unity") %>% 
+  dplyr::rename(addedges = val) %>% 
+  tidyr::unnest(cols = SAout)
+
+# dynamicity 
+NEsims <- simruns %>% 
+  dplyr::filter(mod == "NE") %>% 
+  dplyr::rename(exchangerate = val) %>% 
+  tidyr::unnest(cols = SAout)
+
+
+```
+
+## Analyzing Simulation Variance across Networks
+_NB_ for plotting tractability, we have subsetted to 10-25% of repitiations of final sizes collected from each adaptive simulated annealing simulations. 
+
+### Base Plots
+These are the 10 base plots without any network manipulations. Remember, the initial degree distribution was set to 50 for each node.
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Base Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+lbls <- mapply(function(x,y){mean(c(x,y))}, x = seq(0, 1, length.out = 11), y = dplyr::lead(seq(0, 1, length.out = 11)))[1:10]
+basesims$TransProbFct <- cut(basesims$TransProb, breaks = seq(0, 1, length.out = 11), include.lowest = TRUE,
+                             labels = lbls)
+
+# expand out 
+basesims <- basesims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+# downsize
+keep <- sample(x = c(T,F), size = nrow(basesims), replace = T, prob = c(0.25, 0.75))
+basesimssm <- basesims %>% 
+  dplyr::filter(keep)
+
+
+# plot
+basenetPlotObj <- basesimssm %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = TransProbFct, y = finalsize,
+                   fill = factor(BaseNet))) +
+  scale_fill_viridis_d("Base Networks") + 
+  ylab("Final Size Distribution") + 
+  xlab("Probability of Transmission") + 
+  plot_theme
+
+# call to RMD 
+basenetPlotObj
+
+# save out
+jpeg("figures/base_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 500)
+basenetPlotObj
+graphics.off()
+
+
+
+```
+
+### Degree Distribution
+In addition to the probability of degree connectedness varying, for each node the variance of connections was also varied node using a stick-breaking approach. 
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Degree Dist Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out 
+degreedistsims <-  degreedistsims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+
+# downsize
+keep <- sample(x = c(T,F), size = nrow(degreedistsims), replace = T, prob = c(0.10, 0.9))
+degreedistsimssm <- degreedistsims %>% 
+  dplyr::filter(keep)
+
+# plot 
+degreedistnetPlotObj <- degreedistsimssm %>% 
+  ggplot() + 
+  geom_jitter(aes(x = TransProb, y = finalsize, 
+                  color = factor(mean), 
+                  size = variance,
+                  shape = BaseNet),
+              alpha = 0.1) +
+  scale_colour_viridis_d("Degree Dist. Prob.") +
+  scale_shape_manual("Base Net.", 
+                     values = c(1, 2, 3, 4, 6, 15, 18, 19, 24, 25)) +
+  scale_size_continuous("Degree Dist. Var.") +
+  ylab("Final Size Distribution") + 
+  xlab("Probability of Transmission") + 
+  plot_theme +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+
+
+# call to RMD 
+degreedistnetPlotObj
+
+# save out
+jpeg("figures/degreedist_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 200)
+degreedistnetPlotObj
+graphics.off()
+
+```
+
+### Clustering 
+Varied the clustering coefficient (number of triangles) in the network. 
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Cluster Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out 
+clustersims <-  clustersims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+
+# downsize
+keep <- sample(x = c(T,F), size = nrow(clustersims), replace = T, prob = c(0.10, 0.9))
+clustersimssm <- clustersims %>% 
+  dplyr::filter(keep)
+
+# plot 
+clusternetPlotObj <- clustersimssm %>% 
+  ggplot() + 
+  geom_jitter(aes(x = TransProb, y = finalsize, 
+                  color = factor(clustercoef), 
+                  shape = BaseNet),
+              alpha = 0.1) +
+  scale_colour_viridis_d("Cluster Coeff.") +
+  scale_shape_manual("Base Net.", 
+                     values = c(1, 2, 3, 4, 6, 15, 18, 19, 24, 25)) +
+  xlab("Probability of Transmission") + 
+  ylab("Final Size Distribution") + 
+  plot_theme  +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+
+
+# call to RMD 
+clusternetPlotObj
+
+# save out
+jpeg("figures/clustering_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 500)
+clusternetPlotObj
+graphics.off()
+
+```
+
+### Modularity/Unity
+#### Removing Edges
+From each base network, we removed the most connected `c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000)` edges. High edge betweenness identified with `igraph::betweeness` and randomly removed X set of those edges.
+
+```{r}
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Remove Edge Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out 
+modularitysims <-  modularitysims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+
+# downsize
+keep <- sample(x = c(T,F), size = nrow(modularitysims), replace = T, prob = c(0.10, 0.9))
+modularitysimssm <- modularitysims %>% 
+  dplyr::filter(keep)
+
+# plot 
+modularitynetPlotObj <- modularitysimssm %>% 
+  ggplot() + 
+  geom_jitter(aes(x = TransProb, y = finalsize, 
+                  color = factor(dropedges), 
+                  shape = BaseNet),
+              alpha = 0.1) +
+  scale_colour_viridis_d("Edges Dropped") +
+  scale_shape_manual("Base Net.", 
+                     values = c(1, 2, 3, 4, 6, 15, 18, 19, 24, 25)) +
+  xlab("Probability of Transmission") + 
+  ylab("Final Size Distribution") + 
+  plot_theme  +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+
+
+# call to RMD 
+modularitynetPlotObj
+
+# save out
+jpeg("figures/modularity_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 500)
+modularitynetPlotObj
+graphics.off()
+
+```
+
+
+#### Adding Edges 
+As above, but the oppoite of modularity when starting w/ a base. From each base network, we add the most connected c(5, 10, 15, 25, 50, 100, 250, 500, 750, 1000) (10 parameters) edges that could potentially exist in the completely saturated base graph.
+
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Add Edge Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out 
+unitysims <-  unitysims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+
+# downsize
+keep <- sample(x = c(T,F), size = nrow(unitysims), replace = T, prob = c(0.10, 0.9))
+unitysimssm <- unitysims %>% 
+  dplyr::filter(keep)
+
+# plot 
+unitynetPlotObj <- unitysimssm %>% 
+  ggplot() + 
+  geom_jitter(aes(x = TransProb, y = finalsize, 
+                  color = factor(addedges), 
+                  shape = BaseNet),
+              alpha = 0.1) +
+  scale_colour_viridis_d("Edges Dropped") +
+  scale_shape_manual("Base Net.", 
+                     values = c(1, 2, 3, 4, 6, 15, 18, 19, 24, 25)) +
+  xlab("Probability of Transmission") + 
+  ylab("Final Size Distribution") + 
+  plot_theme  +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+
+
+# call to RMD 
+unitynetPlotObj
+
+# save out
+jpeg("figures/unity_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 500)
+unitynetPlotObj
+graphics.off()
+
+```
+
+
+### Dynamicity 
+We used the [Volz & Meyer 2007](https://pubmed.ncbi.nlm.nih.gov/17878137/) neighbor exchange model to explore the effects of a dynamic network on prediction. The neighbor exchange, or swap, rate parameter was varied on a logarithmic-10 scale from 1e-9 to 1 (10 parameters): `sapply(seq(10, 1), function(x){10^(-x)}))`. _N.B._ the transmission probability by [Newman 2002](https://www.math.uh.edu/~zpkilpat/teaching/math4309/project/pre02_newman.pdf) is only valid for static networks and is therefore misspecified here. 
+
+```{r}
+
+#++++++++++++++++++++++++++++++++++++++++++ 
+### Add Edge Plot        ####
+#++++++++++++++++++++++++++++++++++++++++++
+# expand out 
+NEsims <-  NEsims %>% 
+  tidyr::unnest(cols = finalsize) %>%   
+  dplyr::mutate(finalsize = finalsize/1e3) 
+  
+# downsize
+keep <- sample(x = c(T,F), size = nrow(NEsims), replace = T, prob = c(0.10, 0.9))
+NEsimssm <- NEsims %>% 
+  dplyr::filter(keep)
+
+# plot 
+NEnetPlotObj <- NEsimssm %>% 
+  ggplot() + 
+  geom_jitter(aes(x = TransProb, y = finalsize, 
+                 color = factor(exchangerate), 
+                 shape = BaseNet),
+              alpha = 0.1) +
+  scale_colour_viridis_d("Neigh. Exch. Rate") +
+  scale_shape_manual("Base Net.", 
+                     values = c(1, 2, 3, 4, 6, 15, 18, 19, 24, 25)) +
+  xlab("Probability of Transmission") + 
+  ylab("Final Size Distribution") + 
+  plot_theme  +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+
+
+# call to RMD 
+NEnetPlotObj
+
+# save out
+jpeg("figures/NEdyanamicity_network_final_size_distribution_from_simulations.jpg",
+     width = 11, height = 8, units = "in", res = 500)
+NEnetPlotObj
+graphics.off()
+
+```
+
+
+
+### Collated
+```{r}
+# combin the plots 
+combplot <- cowplot::plot_grid(basenetPlotObj, degreedistnetPlotObj, clusternetPlotObj, modularitynetPlotObj, unitynetPlotObj, NEnetPlotObj, 
+                   nrow = 3, ncol = 2)
+
+
+top <- cowplot::plot_grid(basenetPlotObj, degreedistnetPlotObj, ncol = 2)
+mid <- cowplot::plot_grid(modularitynetPlotObj, unitynetPlotObj, ncol = 2)
+bottom <- cowplot::plot_grid(clusternetPlotObj, NEnetPlotObj, ncol = 2)
+combplot <- cowplot::plot_grid(top, mid, bottom, nrow = 3, ncol = 1)
+
+
+
+
+jpeg("figures/combined_network_final_size_distribution_from_simulations.jpg",
+     width = 24, height = 27, units = "in", res = 500)
+combplot
+graphics.off()
+
+```

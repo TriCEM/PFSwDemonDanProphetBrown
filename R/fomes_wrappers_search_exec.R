@@ -410,7 +410,7 @@ SAmaestro <- sirparams %>%
 Sys.time() - Start
 # tidy up
 SAmaestro <- SAmaestro %>%
-  dplyr::select(c("beta", "durI", "SAout")) %>%
+  dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
   dplyr::mutate(net = opt$netpath)
 
 saveRDS(SAmaestro,

@@ -44,3 +44,5 @@ data/derived_data/
 data/raw_data/mass_action_network/massactionnetwork.RDS
 
 workoutline.md
+
+.Renviron

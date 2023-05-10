@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 This repository is a working [R-Research Copmendium](https://github.com/ropensci/rrrpkg) for the manuscript ****. **<description of findings and results>**
 
 
-### Downloading and Reproducing
+### Downloading and Reproducibility 
 _N.B._ Structure based on Ben Warrick's [`rrtools`](https://github.com/benmarwick/rrtools) and 
 Carl Boettig's [template](https://github.com/cboettig/template) packages. To recreate the analyses are results, initialize the package with the following commands: 
 
@@ -35,6 +35,16 @@ open PFSwDemonDanProphetBrown.git
 devtools::install_deps()
 ```
 In addition we use `renv` to track package dependencies for reproducibility. Please use `renv::restore` to restore the state of the project and see https://rstudio.github.io/renv/articles/renv.html for more information.
+
+#### Important Note
+For the most part, R seeds are consistent across different operating systems with
+the recent exception of `sample` (see discussion [here]() and [release]()). We use 
+the code below to align the `sample` functions across our local and remote cluster
+machines: 
+
+```
+RNGkind(sample.kind = "Rounding")
+```
 
 
 

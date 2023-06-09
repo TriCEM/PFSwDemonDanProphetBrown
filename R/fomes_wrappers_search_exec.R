@@ -67,24 +67,38 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat) {
   # core
   #......................
   if (mod == "NE") {
-    ret <- fomes::sim_Gillespie_SIR(Iseed = 1,
-                                    N = N,
-                                    beta = beta,
-                                    dur_I = durI,
-                                    init_contact_mat = conmat,
-                                    rho = as.numeric(val),
-                                    term_time = Inf,
-                                    return_contact_matrices = FALSE)
+    ret <- fomes::sim_Gillespie_nSIR(Iseed = 1,
+                                     N = N,
+                                     beta = beta,
+                                     dur_I = durI,
+                                     init_contact_mat = conmat,
+                                     rho = as.numeric(val),
+                                     term_time = Inf,
+                                     return_contact_matrices = FALSE)
+
+  } else if (mod == "massaction") {
+    maconmat <- matrix(1, N, N)
+    diag(maconmat) <- 0
+    ret <- fomes::sim_Gillespie_nSIR(Iseed = 1,
+                                     N = N,
+                                     beta = beta*N,
+                                     dur_I = durI,
+                                     init_contact_mat = maconmat,
+                                     rho = as.numeric(val),
+                                     term_time = Inf,
+                                     return_contact_matrices = FALSE)
+
+
 
   } else {
-    ret <- fomes::sim_Gillespie_SIR(Iseed = 1,
-                                    N = N,
-                                    beta = beta,
-                                    dur_I = durI,
-                                    init_contact_mat = conmat,
-                                    rho = .Machine$double.xmin,
-                                    term_time = Inf,
-                                    return_contact_matrices = FALSE)
+    ret <- fomes::sim_Gillespie_nSIR(Iseed = 1,
+                                     N = N,
+                                     beta = beta,
+                                     dur_I = durI,
+                                     init_contact_mat = conmat,
+                                     rho = .Machine$double.xmin,
+                                     term_time = Inf,
+                                     return_contact_matrices = FALSE)
   }
 
   #......................

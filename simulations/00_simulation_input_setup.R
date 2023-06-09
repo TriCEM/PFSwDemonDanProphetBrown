@@ -17,6 +17,8 @@ source("R/network_manipulations.R")
 set.seed(42) # meaning of life
 # population size
 N <- 1e3
+# initial edge/degree number for each node in base simulations
+SIMinitdegrees <- 20
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Maestro Setup                      ####
@@ -36,17 +38,14 @@ N <- 1e3
 # save these out for later call and expansion for snakemake
 # separating this out for optimal batching
 #......................
-betaI <-seq(0.1, 1, by = 0.2)
+betaI <- c(0.005, 0.01, 0.05, 0.075, 0.1)
 durationI <- seq(3, 15, by = 3)
 sirparams <- tidyr::expand_grid(betaI = betaI,
                                 durationI = durationI)
-SIRpath <- "data/raw_data/SIRparams/sirparam_vals.RDS"
-dir.create(sub("sirparam_vals.RDS", "", SIRpath), recursive = T)
-saveRDS(sirparams, SIRpath)
 #..........
 # make Mass Action Model
 #..........
-outdir <- "data/raw_data/mass_action_network/"
+outdir <- "simulations/00_snakeinput_networks/mass_action_network/"
 dir.create(outdir, recursive = T)
 maoupath <- paste0(outdir, "massactionnetwork.RDS")
 manet <- matrix(data = 1, nrow = N, ncol = N)
@@ -62,13 +61,13 @@ massactiondf <- tibble::tibble(
 #......................
 # STEP 1: generate 10 base networks
 #......................
-outdir <- "data/raw_data/base_networks/"
+outdir <- "simulations/00_snakeinput_networks/base_networks/"
 dir.create(outdir, recursive = T)
-basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_0_", x, ".RDS"))
+basenetpaths <- sapply(1:10, function(x) paste0(outdir, "base_", x, ".RDS"))
 
 # create networks with igraph degree sequence game
 base_networks <- replicate(10,
-                           igraph::degree.sequence.game(out.deg = rep(50, N),
+                           igraph::degree.sequence.game(out.deg = rep(SIMinitdegrees, N),
                              method = "vl"))
 
 # save out
@@ -81,9 +80,10 @@ mapply(function(x,y){saveRDS(x, file = y)},
 # Performing network manipulations on our 10 base models
 maestro_dfbase <- tibble::tibble(
   network_manip = "base",
-  param = "b",
+  param = "base",
   val = as.character(0),
-  path = basenetpaths) %>%
+  path = basenetpaths,
+  network = base_networks) %>%
   dplyr::mutate(num = stringr::str_extract(path, "[0-9]*.RDS"),
                 num = stringr::str_replace(num, ".RDS", ""),
                 num = as.numeric(num)) %>%
@@ -105,14 +105,14 @@ dfdegdist <- tidyr::expand_grid(basenetpaths, degprobdist, degvardist) %>%
 #......................
 # run manipulations via search using wrapper for mem optim
 dfdegdist <- dfdegdist %>%
-  dplyr::mutate(new_network = purrr::pmap(.,
+  dplyr::mutate(network = purrr::pmap(.,
                                           wrapper_manip_degdist,
                                           .progress = TRUE))
 
 #......................
 # write these out
 #......................
-outdir <- "data/raw_data/degreedist_networks/"
+outdir <- "simulations/00_snakeinput_networks/degreedist_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfdegdist <- dfdegdist %>%
   dplyr::mutate(basenetcnt = stringr::str_extract(basenetpath, "[0-9]*.RDS"),
@@ -126,15 +126,13 @@ maestro_dfdegdist <- dfdegdist %>%
                               param, "_", val, "_",
                               basenetcnt, ".RDS")) %>%
   dplyr::arrange(param, val, basenetcnt) %>%
-  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+  dplyr::select(c("network_manip", "param", "val", "path", "network"))
 
 # write out networks out of scope
 mapply(function(x, y) { saveRDS(x, file = y) },
-       x = maestro_dfdegdist$new_network,
+       x = maestro_dfdegdist$network,
        y = maestro_dfdegdist$path)
-# drop for mem
-maestro_dfdegdist <- maestro_dfdegdist %>%
-  dplyr::select(-c("new_network"))
+
 
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -150,14 +148,14 @@ dfmodularity <- tidyr::expand_grid(basenetpaths, edgedrop) %>%
 # perform manipulations
 #......................
 dfmodularity <- dfmodularity %>%
-  dplyr::mutate(new_network = purrr::pmap(.,
+  dplyr::mutate(network = purrr::pmap(.,
                                           wrapper_manip_modular_rmedges,
                                           .progress = TRUE))
 
 #......................
 # write these out
 #......................
-outdir <- "data/raw_data/modularity_networks/"
+outdir <- "simulations/00_snakeinput_networks/modularity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfmodularity <- dfmodularity %>%
   dplyr::mutate(val = as.character(edge_rm_num)) %>%
@@ -171,16 +169,12 @@ maestro_dfmodularity <- dfmodularity %>%
                               param, "_", val, "_",
                               basenetcnt, ".RDS")) %>%
   dplyr::arrange(param, val, basenetcnt) %>%
-  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+  dplyr::select(c("network_manip", "param", "val", "path", "network"))
 
 # write out networks out of scope
 mapply(function(x, y) { saveRDS(x, file = y) },
-       x = maestro_dfmodularity$new_network,
+       x = maestro_dfmodularity$network,
        y = maestro_dfmodularity$path)
-# drop for mem
-maestro_dfmodularity <- maestro_dfmodularity %>%
-  dplyr::select(-c("new_network"))
-
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Unity       ####
@@ -194,14 +188,14 @@ dfunity <- tidyr::expand_grid(basenetpaths, edgeadd) %>%
 # perform manipulations
 #......................
 dfunity <- dfunity %>%
-  dplyr::mutate(new_network = purrr::pmap(.,
+  dplyr::mutate(network = purrr::pmap(.,
                                           wrapper_manip_unity_addedges,
                                           .progress = TRUE))
 
 #......................
 # write these out
 #......................
-outdir <- "data/raw_data/unity_networks/"
+outdir <- "simulations/00_snakeinput_networks/unity_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfunity <- dfunity %>%
   dplyr::mutate(val = as.character(edge_add_num)) %>%
@@ -215,16 +209,12 @@ maestro_dfunity <- dfunity %>%
                               param, "_", val, "_",
                               basenetcnt, ".RDS")) %>%
   dplyr::arrange(param, val, basenetcnt) %>%
-  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+  dplyr::select(c("network_manip", "param", "val", "path", "network"))
 
 # write out networks out of scope
 mapply(function(x, y) { saveRDS(x, file = y) },
-       x = maestro_dfunity$new_network,
+       x = maestro_dfunity$network,
        y = maestro_dfunity$path)
-# drop for mem
-maestro_dfunity <- maestro_dfunity %>%
-  dplyr::select(-c("new_network"))
-
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Clustering       ####
@@ -239,14 +229,14 @@ dfclusted <- tidyr::expand_grid(basenetpaths, clusted) %>%
 # perform manipulations
 #......................
 dfclusted <- dfclusted %>%
-  dplyr::mutate(new_network = purrr::pmap(.,
+  dplyr::mutate(network = purrr::pmap(.,
                                           wrapper_manip_clust_edges,
                                           .progress = TRUE))
 
 #......................
 # write these out
 #......................
-outdir <- "data/raw_data/cluster_networks/"
+outdir <- "simulations/00_snakeinput_networks/cluster_networks/"
 dir.create(outdir, recursive = T)
 maestro_dfclusted <- dfclusted %>%
   dplyr::mutate(val = as.character(new_transitivity_prob)) %>%
@@ -260,16 +250,12 @@ maestro_dfclusted <- dfclusted %>%
                               param, "_", val, "_",
                               basenetcnt, ".RDS")) %>%
   dplyr::arrange(param, val, basenetcnt) %>%
-  dplyr::select(c("network_manip", "param", "val", "path", "new_network"))
+  dplyr::select(c("network_manip", "param", "val", "path", "network"))
 
 # write out networks out of scope
 mapply(function(x, y) { saveRDS(x, file = y) },
-       x = maestro_dfclusted$new_network,
+       x = maestro_dfclusted$network,
        y = maestro_dfclusted$path)
-# drop for mem
-maestro_dfclusted <- maestro_dfclusted %>%
-  dplyr::select(-c("new_network"))
-
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Neighbor Exchange       ####
@@ -286,7 +272,8 @@ maestro_dfNEdyn <- tidyr::expand_grid(basenetpaths, nexchange_rate) %>%
                 basenetcnt = stringr::str_replace(basenetcnt, ".RDS", ""),
                 basenetcnt = as.numeric(basenetcnt)) %>%
   dplyr::arrange(param, val, basenetcnt) %>%
-  dplyr::select(c("network_manip", "param", "val", "path"))
+  dplyr::select(c("network_manip", "param", "val", "path")) %>%
+  dplyr::mutate(network = purrr::map(path, readRDS))
 
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -300,16 +287,37 @@ maestro <- dplyr::bind_rows(massactiondf,
                             maestro_dfunity,
                             maestro_dfclusted,
                             maestro_dfNEdyn)
-
-# add in outpath
-maestro_out <- maestro %>%
-  dplyr::mutate(SIRParampath = SIRpath) %>%
-  dplyr::mutate(outpath = purrr::pmap_chr(., function(SIRParampath, network_manip, param, val, path){
-    paste0("SimRet-", path)}
-  ))
+# bring in SIR params
+maestro <- tidyr::expand_grid(sirparams, maestro)
 
 
+# write inputs out to local computer for snakemake to act on
+snakeinputdatpath <- "simulations/00_snakeinput_data/"
+dir.create(snakeinputdatpath, recursive = T)
+# create key and nest relevant data
+mykey <- 1:nrow(maestro)
+maestronest <- maestro %>%
+  dplyr::mutate(key = mykey) %>%
+  dplyr::group_by(key) %>%
+  tidyr::nest(data = c("betaI", "durationI", "network_manip", "param", "val", "path", "network"))
+# write input out fxn
+writeModInOutput <- function(key, data, snakeinputdatpath){
+  outnm <- paste0(snakeinputdatpath, "key", key, "_snakedatinput.RDS")
+  saveRDS(data, outnm)
+  return(outnm)
+}
+# manipulate in place here and retrn key name
+maestronest <- maestronest %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(input = purrr::pmap_chr(maestronest, writeModInOutput, snakeinputdatpath = snakeinputdatpath))
+# now manipulate for outpath and snake map
+mastrotsv <- maestronest %>%
+  dplyr::mutate(outpath = basename(input),
+                outpath = stringr::str_replace(outpath, "_snakedatinput.RDS", "_snakeoutput.RDS")) %>%
+  dplyr::select(c("input", "outpath"))
 #......................
 # save out map file for snakemake
 #......................
-readr::write_tsv(maestro_out, file = "data/raw_data/maestro_map.tsv")
+# now write out for snakemake
+readr::write_tsv(x = mastrotsv,
+                 file = "simulations/00_snakeinput_map.tsv")

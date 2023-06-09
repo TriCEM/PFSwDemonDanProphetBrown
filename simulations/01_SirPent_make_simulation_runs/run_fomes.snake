@@ -14,7 +14,7 @@ import re
 import pandas as pd
 
 ## read project-specific configuration options and functions
-ROOT = config["root"]
+RROOT = config["rroot"]
 OUTROOT = config["outdir"]
 
 def read_manifest(file_path):
@@ -27,30 +27,22 @@ def read_manifest(file_path):
 sim_map = read_manifest(config["simmap"])
 # Manually transform dictionary to map "outpath" values to our wanted parameter values
 sim_dict = {sim_map['outpath'][i]:
-    {'SIRP': sim_map['SIRParampath'][i],
-    'network_manip': sim_map['network_manip'][i],
-    'param': sim_map['param'][i],
-    'val': sim_map['val'][i],
-    'path': sim_map['path'][i]}
+    {'input': RROOT + sim_map['input'][i]}
 for i in range(len(sim_map['outpath']))}
 
 
 # rules
 rule all:
-    input: expand("{outpath}", outpath = list(sim_map["outpath"].values()))
+    input: expand(OUTROOT + "{outpath}", outpath = list(sim_map["outpath"].values()))
 
 rule run_simulation:
-    output: "{outpath}"
+    output: OUTROOT + "{outpath}"
     log: OUTROOT + "logs/{outpath}.log"
     params:
-        rexec = ROOT + "R/fomes_wrappers_search_exec.R",
-        mod = lambda wildcards: sim_dict[wildcards.outpath]['network_manip'],
-        SIRP = lambda wildcards: sim_dict[wildcards.outpath]['SIRP'],
-        path = lambda wildcards: sim_dict[wildcards.outpath]['path'],
-        val = lambda wildcards: sim_dict[wildcards.outpath]['val'],
-        reps = 100,
+        rexec = RROOT + "R/fomes_wrappers_search_exec.R",
+        inputpath = lambda wildcards: sim_dict[wildcards.outpath]['input'],
         outdir = OUTROOT,
-        Rdir = ROOT,
+        reps = 100,
         maxIter = 50,
         Iters = 25,
         AddOnIters = 5,
@@ -59,18 +51,14 @@ rule run_simulation:
     shell:
         r"""
         Rscript {params.rexec} \
-        --mod {params.mod} \
-        --SIRParams {params.SIRP} \
-        --netpath {params.path} \
-        --val {params.val} \
-        --reps {params.reps} \
+        --input {params.inputpath}
         --output {output} \
-        --outdir {params.outdir} \
-        --Rdir {params.Rdir} \
+        --reps {params.reps} \
         --maxIter {params.maxIter} \
         --Iters {params.Iters} \
         --AddOnIters {params.AddOnIters} \
         --coolingB {params.coolingB} \
         --Temperature {params.Temperature} \
+        --bias TRUE \
         2> {log}
         """

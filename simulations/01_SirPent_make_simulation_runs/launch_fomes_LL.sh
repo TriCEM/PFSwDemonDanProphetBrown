@@ -1,16 +1,16 @@
 #! /bin/bash
 
 ROOT=/proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown # root directory for project (non-scratch)
-WD=/pine/scr/n/f/nfb/Projects/Projects/PFSwDemonDanProphetBrown/ # scratch directory for networks
+WD=/work/users/n/f/nfb/Projects/Projects/PFSwDemonDanProphetBrown/ # scratch directory for networks
 NODES=1028 # max number of cluster nodes
 WAIT=30 # number of seconds to wait for files to appear, absorbing some file system latency
 
 snakemake \
-	--snakefile $ROOT/data/SirPent/run_fomes.snake \
-	--configfile $ROOT/data/SirPent/config_fomes_batch_LL.yaml \
+	--snakefile $ROOT/simulations/01_SirPent_make_simulation_runs/SirPent/run_fomes.snake \
+	--configfile $ROOT/simulations/01_SirPent_make_simulation_runs/config_fomes_batch_LL.yaml \
 	--printshellcmds \
 	--directory $WD \
-	--cluster $ROOT/data/SirPent/launch_heavy.py \
+	--cluster $ROOT/dsimulations/01_SirPent_make_simulation_runs/launch_heavy.py \
 	-j $NODES \
 	--rerun-incomplete \
 	--keep-going \

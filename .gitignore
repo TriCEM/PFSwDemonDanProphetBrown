@@ -13,15 +13,12 @@ data/SirPent/local_launch_fomes.sh
 .RData
 
 # Data files priv/too large
+workoutline.md
 sandbox/
 ignore/
-data/raw_data/base_networks/
-data/raw_data/degreedist_networks/
-data/raw_data/modularity_networks/
-data/raw_data/unity_networks/
-data/raw_data/cluster_networks/
-data/raw_data/SIRparams/
-data/derived_data/
+simulations/00_snakeinput_data/
+simulations/00_snakeinput_networks/
+simulations/01_generated_simulation_runs/
 
 # knitr and R markdown default cache directories
 /*_cache/
@@ -39,10 +36,6 @@ data/derived_data/
 
 # MAC files
 .DS_Store
-
-
-data/raw_data/mass_action_network/massactionnetwork.RDS
-
-workoutline.md
-
 .Renviron
+
+simulations/OLD-01_generated_simulation_runs/

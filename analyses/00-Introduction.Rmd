@@ -1,0 +1,15 @@
+---
+title: "Introduction"
+output: html_document
+date: "2023-05-18"
+---
+
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction
+This document explores various questions proposed by GCP5 in their original hypothesis-generating
+[Gdoc](https://docs.google.com/document/d/1FzXDDyk9h-pWg3O_epDkDZFXIX0Auyk_klfA0C8Ctdk/edit?usp=sharing). Sections are back-ended by various simulation runs that can be found in the `simulations` directory. 

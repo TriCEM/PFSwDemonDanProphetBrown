@@ -159,7 +159,7 @@ proposal <- function(currB, currD, iters) {
 
 adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Temp = 1,
                                 mod, beta, durI, val, reps, conmat,
-                                outdir, output) {
+                                output) {
   #......................
   # checks
   #......................
@@ -173,8 +173,7 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
   goodegg::assert_single_numeric(durI)
   goodegg::assert_single_string(val)
   goodegg::assert_single_int(reps)
-  goodegg::assert_square_matrix(conmat)
-  goodegg::assert_single_string(outdir)
+  goodegg::assert_square_matrix(as.matrix(conmat))
   goodegg::assert_single_string(output)
 
   #......................
@@ -304,6 +303,86 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
 }
 
 
+#++++++++++++++++++++++++++++++++++++++++++
+#### Observation Bias Function Wrapper #####
+#++++++++++++++++++++++++++++++++++++++++++
+#' @title Introduce Bias
+#' @inheritParams wrap_sim_fomes
+#' @description NO adaptive SA - just single value
+#' @details
+#' @returns
+#' @export
+
+sim_observation_bias <- function(mod, beta, durI, val, reps, conmat,
+                                 bias = c(0.01, 0.05, 0.1)) {
+  #............................................................
+  # checks
+  #............................................................
+  goodegg::assert_single_string(mod)
+  goodegg::assert_single_numeric(beta)
+  goodegg::assert_single_numeric(durI)
+  goodegg::assert_single_string(val)
+  goodegg::assert_single_int(reps)
+  goodegg::assert_square_matrix(as.matrix(conmat))
+  goodegg::assert_numeric(bias)
+
+  #............................................................
+  # setup (const, storage, etc)
+  #............................................................
+  ### Call Seed for Reproducibility
+  RNGkind(sample.kind = "Rounding")
+  # each beta, dur, and network - and now bias - will have it's own set of #rep independent seed
+  seeds <- sample(1:1e3, size = length(bias)*reps, replace = F)
+
+
+  #............................................................
+  # core
+  #............................................................
+  #......................
+  # introduce bias
+  #......................
+  biasedconmat <- tibble::tibble(bias = bias,
+                               conmat = list(conmat))
+
+  biasconmatfunx <- function(conmat, bias) {
+    newconmat <- conmat <- as.matrix(conmat)
+    # lift to just lower tri for symmetry
+    conmat <- conmat[lower.tri(conmat)]
+    #
+    p <- sum(conmat)/length(conmat) # flip w/ orig deg dist density to not alter underlying network properties
+    v <- sample(1:length(conmat), floor(length(conmat) * bias), replace = F)
+    conmat[v] <- rbinom(n = length(v), size = 1, prob = c(p, 1-p)) # potentially change values and introduce bias
+    # now make changes and make it symmetric
+    newconmat <- matrix(NA, nrow = nrow(newconmat), ncol = ncol(newconmat))
+    newconmat[lower.tri(newconmat)] <- conmat
+    newconmat[upper.tri(newconmat)] <- t(newconmat)[upper.tri(newconmat)]
+    diag(newconmat) <- 0
+    return(newconmat)
+  }
+  biasedconmat <- biasedconmat %>%
+    dplyr::mutate(biasconmat = purrr::pmap(., biasconmatfunx)) %>%
+    dplyr::select(-c("conmat")) %>%
+    dplyr::rename(conmat = biasconmat)
+
+
+  #......................
+  # expand out simmap
+  #......................
+  reps <- 1:reps
+  simmap <- tidyr::expand_grid(mod, val, reps, beta, durI, bias) %>%
+    dplyr::mutate(seed = seeds) %>%
+    dplyr::left_join(., biasedconmat, by = "bias")
+  # not wrap_fomes doesn't have bias
+  simmap$biasfinalsize <- purrr::pmap(simmap[, c("seed", "mod", "beta",
+                                                 "durI", "val", "reps", "conmat")],
+                                      wrap_sim_fomes)
+  #............................................................
+  # out
+  #............................................................
+  return(simmap)
+}
+
+
 
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -313,31 +392,9 @@ adaptive_sim_anneal <- function(maxIter, Iters, AddOnIters, coolingB = 1e-3, Tem
 #### parse CL inputs     #####
 #++++++++++++++++++++++++++++++++++++++++++
 option_list=list(
-
-  make_option(c("-m", "--mod"),
+  make_option(c("-n", "--input"),
               type = "character", default = NULL,
-              help = paste("Model type"),
-              metavar = "character"),
-
-
-  make_option(c("-p", "--SIRParams"),
-              type = "character", default = NULL,
-              help = paste("File path for transmission param values to iterate over"),
-              metavar = "character"),
-
-  make_option(c("-n", "--netpath"),
-              type = "character", default = NULL,
-              help = paste("File path for network to consider"),
-              metavar = "character"),
-
-  make_option(c("-v", "--val"),
-              type = "numeric", default = NULL,
-              help = paste("Value of NE for specific Gillespie SIR-NE Model Simulation"),
-              metavar = "character"),
-
-  make_option(c("-r", "--reps"),
-              type = "integer", default = NULL,
-              help = paste("Number of reps to consider"),
+              help = paste("Input filename to read simulation guides from"),
               metavar = "character"),
 
   make_option(c("-o", "--output"),
@@ -345,14 +402,9 @@ option_list=list(
               help = paste("Output filename to write result of Gillespie SIR-NE Model Simulation"),
               metavar = "character"),
 
-  make_option(c("-x", "--outdir"),
-              type = "character", default = NULL,
-              help = paste("Output directory to write result of Gillespie SIR-NE Model Simulation"),
-              metavar = "character"),
-
-  make_option(c("-s", "--Rdir"),
-              type = "character", default = NULL,
-              help = paste("Root directory of R project"),
+  make_option(c("-r", "--reps"),
+              type = "integer", default = NULL,
+              help = paste("Number of reps to consider"),
               metavar = "character"),
 
   make_option(c("-z", "--maxIter"),
@@ -378,7 +430,12 @@ option_list=list(
   make_option(c("-t", "--Temperature"),
               type = "numeric", default = NULL,
               help = paste("Initial temperature for adaptive simulated annealing"),
-              metavar = "character")
+              metavar = "character"),
+
+  make_option(c("-b", "--bias"),
+              type = "logical", default = NULL,
+              help = paste("Whether we are doing bias simulations"),
+              metavar = "logical")
 )
 
 opt_parser <- OptionParser(option_list = option_list)
@@ -388,39 +445,62 @@ opt <- parse_args(opt_parser)
 #++++++++++++++++++++++++++++++++++++++++++
 #### Unpack from CL        #####
 #++++++++++++++++++++++++++++++++++++++++++
-mod <- opt$mod
-val <- opt$val
-sirparams <- readRDS(paste0(opt$Rdir, opt$SIRParams))
-netgraph <- readRDS(paste0(opt$Rdir, opt$netpath))
-conmat <- igraph::as_adjacency_matrix(netgraph, sparse = F)
+simguide <- readRDS(opt$input)
+betaI <- simguide$betaI
+durationI <- simguide$durationI
+mod <- simguide$network_manip
+val <- simguide$val
+netgraph <- simguide$network[[1]]
+conmat <- igraph::as_adjacency_matrix(netgraph, sparse = T)
 reps <- opt$reps
 output <- opt$output
-outdir <- opt$outdir
 maxIter <- opt$maxIter
-Iters <-opt$Iters
+Iters <- opt$Iters
 AddOnIters <-opt$AddOnIters
 coolingB <- opt$coolingB
 Temp <- opt$Temperature
+bias <- opt$bias
+
+
+#++++++++++++++++++++++++++++++++++++++++++
+### Observation Bias ####
+#++++++++++++++++++++++++++++++++++++++++++
+if (bias) {
+  # run
+  biasout <- sim_observation_bias(
+    mod = mod,
+    beta = betaI,
+    durI = durationI,
+    val = val,
+    reps = reps,
+    conmat = conmat,
+    bias = c(0.01, 0.05, 0.1))
+  # adjust ouput
+  biasoutput <- output
+  biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
+  # save
+  saveRDS(biasout, file = biasoutput)
+}
+
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung ####
 #++++++++++++++++++++++++++++++++++++++++++
 Start <- Sys.time()
-SAmaestro <- sirparams %>%
-  dplyr::rename(beta = betaI,
-                durI = durationI) %>%
-  dplyr::mutate(maxIter = maxIter,
-                Iters = Iters,
-                AddOnIters = AddOnIters,
-                coolingB = coolingB,
-                Temp = Temp,
-                mod = mod,
-                val = val,
-                reps = reps,
-                conmat = list(conmat),
-                outdir = outdir,
-                output = output) %>%
-  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
+SAmaestro <- tibble::tibble(
+                          beta = betaI,
+                          durI = durationI,
+                          maxIter = maxIter,
+                          Iters = Iters,
+                          AddOnIters = AddOnIters,
+                          coolingB = coolingB,
+                          Temp = Temp,
+                          mod = mod,
+                          val = val,
+                          reps = reps,
+                          conmat = list(conmat),
+                          output = output) %>%
+                          dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
 Sys.time() - Start
 # tidy up
 SAmaestro <- SAmaestro %>%
@@ -428,7 +508,7 @@ SAmaestro <- SAmaestro %>%
   dplyr::mutate(net = opt$netpath)
 
 saveRDS(SAmaestro,
-        file = paste0(outdir, output))
+        file = output)
 
 # turn warnings back to default
 options(warn = defaultwarnings)

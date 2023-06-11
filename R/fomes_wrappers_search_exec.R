@@ -483,7 +483,6 @@ Temp <- opt$Temperature
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
-cat(maxIter)
 Start <- Sys.time()
 SAmaestro <- tibble::tibble(
   beta = betaI,
@@ -497,17 +496,23 @@ SAmaestro <- tibble::tibble(
   val = val,
   reps = reps,
   conmat = list(conmat),
-  output = output) %>%
-  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
-Sys.time() - Start
-# tidy up
-SAmaestro <- SAmaestro %>%
-  dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
-  dplyr::mutate(net = opt$netpath)
+  output = output)
+
+SAmaestro
 
 
-saveRDS(SAmaestro,
-        file = output)
 
-# turn warnings back to default
+# %>%
+#   dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
+# Sys.time() - Start
+# # tidy up
+# SAmaestro <- SAmaestro %>%
+#   dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
+#   dplyr::mutate(net = opt$netpath)
+#
+#
+# saveRDS(SAmaestro,
+#         file = output)
+#
+# # turn warnings back to default
 options(warn = defaultwarnings)

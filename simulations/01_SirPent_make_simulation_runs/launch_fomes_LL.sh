@@ -6,7 +6,7 @@ NODES=1028 # max number of cluster nodes
 WAIT=30 # number of seconds to wait for files to appear, absorbing some file system latency
 
 snakemake \
-	--snakefile $ROOT/simulations/01_SirPent_make_simulation_runs/SirPent/run_fomes.snake \
+	--snakefile $ROOT/simulations/01_SirPent_make_simulation_runs/run_fomes.snake \
 	--configfile $ROOT/simulations/01_SirPent_make_simulation_runs/config_fomes_batch_LL.yaml \
 	--printshellcmds \
 	--directory $WD \

@@ -59,6 +59,5 @@ rule run_simulation:
         --AddOnIters {params.AddOnIters} \
         --coolingB {params.coolingB} \
         --Temperature {params.Temperature} \
-        --bias TRUE \
         2> {log}
         """

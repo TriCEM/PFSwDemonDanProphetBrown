@@ -342,7 +342,7 @@ sim_observation_bias <- function(mod, beta, durI, val, reps, conmat,
   # introduce bias
   #......................
   biasedconmat <- tibble::tibble(bias = bias,
-                               conmat = list(conmat))
+                                 conmat = list(conmat))
 
   biasconmatfunx <- function(conmat, bias) {
     newconmat <- conmat <- as.matrix(conmat)
@@ -459,53 +459,51 @@ Iters <- opt$Iters
 AddOnIters <-opt$AddOnIters
 coolingB <- opt$coolingB
 Temp <- opt$Temperature
-bias <- opt$bias
 
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Observation Bias ####
 #++++++++++++++++++++++++++++++++++++++++++
-if (bias) {
-  # run
-  biasout <- sim_observation_bias(
-    mod = mod,
-    beta = betaI,
-    durI = durationI,
-    val = val,
-    reps = reps,
-    conmat = conmat,
-    bias = c(0.01, 0.05, 0.1))
-  # adjust ouput
-  biasoutput <- output
-  biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
-  # save
-  saveRDS(biasout, file = biasoutput)
-}
+# run
+biasout <- sim_observation_bias(
+  mod = mod,
+  beta = betaI,
+  durI = durationI,
+  val = val,
+  reps = reps,
+  conmat = conmat,
+  bias = c(0.01, 0.05, 0.1))
+# adjust ouput
+biasoutput <- output
+biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
+# save
+saveRDS(biasout, file = biasoutput)
 
 
 #++++++++++++++++++++++++++++++++++++++++++
-### Run What you Brung ####
+### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
 Start <- Sys.time()
 SAmaestro <- tibble::tibble(
-                          beta = betaI,
-                          durI = durationI,
-                          maxIter = maxIter,
-                          Iters = Iters,
-                          AddOnIters = AddOnIters,
-                          coolingB = coolingB,
-                          Temp = Temp,
-                          mod = mod,
-                          val = val,
-                          reps = reps,
-                          conmat = list(conmat),
-                          output = output) %>%
-                          dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
+  beta = betaI,
+  durI = durationI,
+  maxIter = maxIter,
+  Iters = Iters,
+  AddOnIters = AddOnIters,
+  coolingB = coolingB,
+  Temp = Temp,
+  mod = mod,
+  val = val,
+  reps = reps,
+  conmat = list(conmat),
+  output = output) %>%
+  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
 Sys.time() - Start
 # tidy up
 SAmaestro <- SAmaestro %>%
   dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
   dplyr::mutate(net = opt$netpath)
+
 
 saveRDS(SAmaestro,
         file = output)

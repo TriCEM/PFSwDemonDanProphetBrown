@@ -10,7 +10,7 @@ snakemake \
 	--configfile $ROOT/simulations/01_SirPent_make_simulation_runs/config_fomes_batch_LL.yaml \
 	--printshellcmds \
 	--directory $WD \
-	--cluster $ROOT/dsimulations/01_SirPent_make_simulation_runs/launch_heavy.py \
+	--cluster $ROOT/simulations/01_SirPent_make_simulation_runs/launch_heavy.py \
 	-j $NODES \
 	--rerun-incomplete \
 	--keep-going \

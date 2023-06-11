@@ -441,7 +441,6 @@ option_list=list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
-opt
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Unpack from CL        #####
@@ -465,20 +464,20 @@ Temp <- opt$Temperature
 #++++++++++++++++++++++++++++++++++++++++++
 ### Observation Bias ####
 #++++++++++++++++++++++++++++++++++++++++++
-# # run
-# biasout <- sim_observation_bias(
-#   mod = mod,
-#   beta = betaI,
-#   durI = durationI,
-#   val = val,
-#   reps = reps,
-#   conmat = conmat,
-#   bias = c(0.01, 0.05, 0.1))
-# # adjust ouput
-# biasoutput <- output
-# biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
-# # save
-# saveRDS(biasout, file = biasoutput)
+# run
+biasout <- sim_observation_bias(
+  mod = mod,
+  beta = betaI,
+  durI = durationI,
+  val = val,
+  reps = reps,
+  conmat = conmat,
+  bias = c(0.01, 0.05, 0.1))
+# adjust ouput
+biasoutput <- output
+biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
+# save
+saveRDS(biasout, file = biasoutput)
 
 
 #++++++++++++++++++++++++++++++++++++++++++
@@ -497,23 +496,17 @@ SAmaestro <- tibble::tibble(
   val = val,
   reps = reps,
   conmat = list(conmat),
-  output = output)
+  output = output) %>%
+  dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
+Sys.time() - Start
+# tidy up
+SAmaestro <- SAmaestro %>%
+  dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
+  dplyr::mutate(net = opt$netpath)
 
-SAmaestro
 
+saveRDS(SAmaestro,
+        file = output)
 
-
-# %>%
-#   dplyr::mutate(SAout = purrr::pmap(., adaptive_sim_anneal))
-# Sys.time() - Start
-# # tidy up
-# SAmaestro <- SAmaestro %>%
-#   dplyr::select(c("beta", "durI", "SAout", "mod", "val")) %>%
-#   dplyr::mutate(net = opt$netpath)
-#
-#
-# saveRDS(SAmaestro,
-#         file = output)
-#
-# # turn warnings back to default
+# turn warnings back to default
 options(warn = defaultwarnings)

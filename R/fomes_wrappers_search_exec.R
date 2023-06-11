@@ -483,6 +483,7 @@ Temp <- opt$Temperature
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
+cat(maxIter)
 Start <- Sys.time()
 SAmaestro <- tibble::tibble(
   beta = betaI,

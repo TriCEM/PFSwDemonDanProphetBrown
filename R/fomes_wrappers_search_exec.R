@@ -435,12 +435,13 @@ option_list=list(
   make_option(c("-b", "--bias"),
               type = "logical", default = NULL,
               help = paste("Whether we are doing bias simulations"),
-              metavar = "logical")
+              metavar = "character")
 )
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
+opt
 
 #++++++++++++++++++++++++++++++++++++++++++
 #### Unpack from CL        #####

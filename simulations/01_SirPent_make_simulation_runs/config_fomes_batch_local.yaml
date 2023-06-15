@@ -1,5 +1,0 @@
-# configuration for simulation runs
-
-rroot: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/
-simmap: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/simulations/00_snakeinput_map_TEST.tsv
-outdir: /Users/nbrazeau/Documents/Github/PFSwDemonDanProphetBrown/simulations/01_generated_simulation_runs/

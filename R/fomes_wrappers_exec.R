@@ -253,7 +253,7 @@ biasout <- sim_observation_bias(
   durI = durationI,
   val = val,
   reps = reps,
-  conmat = list(conmat),
+  conmat = conmat,
   bias = c(0.01, 0.05, 0.1))
 # adjust ouput
 biasoutput <- output

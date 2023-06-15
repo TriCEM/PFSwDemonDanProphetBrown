@@ -39,26 +39,16 @@ rule run_simulation:
     output: OUTROOT + "{outpath}"
     log: OUTROOT + "logs/{outpath}.log"
     params:
-        rexec = RROOT + "R/fomes_wrappers_search_exec.R",
+        rexec = RROOT + "R/fomes_wrappers_exec.R",
         inputpath = lambda wildcards: sim_dict[wildcards.outpath]['input'],
         outdir = OUTROOT,
         reps = 100,
-        maxIter = 50,
-        Iters = 25,
-        AddOnIters = 5,
-        coolingB = 0.001,
-        Temperature = 1.0,
     shell:
         r"""
         Rscript {params.rexec} \
         --input {params.inputpath} \
         --output {output} \
         --reps {params.reps} \
-        --maxIter {params.maxIter} \
-        --Iters {params.Iters} \
-        --AddOnIters {params.AddOnIters} \
-        --coolingB {params.coolingB} \
-        --Temperature {params.Temperature} \
         --bias TRUE \
         2> {log}
         """

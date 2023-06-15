@@ -461,24 +461,6 @@ coolingB <- opt$coolingB
 Temp <- opt$Temperature
 
 
-#++++++++++++++++++++++++++++++++++++++++++
-### Observation Bias ####
-#++++++++++++++++++++++++++++++++++++++++++
-# run
-biasout <- sim_observation_bias(
-  mod = mod,
-  beta = betaI,
-  durI = durationI,
-  val = val,
-  reps = reps,
-  conmat = conmat,
-  bias = c(0.01, 0.05, 0.1))
-# adjust ouput
-biasoutput <- output
-biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
-# save
-saveRDS(biasout, file = biasoutput)
-
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####

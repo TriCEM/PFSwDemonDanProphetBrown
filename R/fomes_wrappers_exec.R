@@ -54,7 +54,7 @@ library(magrittr)
 #++++++++++++++++++++++++++++++++++++++++++
 #### Fomes Wrapper Function        #####
 #++++++++++++++++++++++++++++++++++++++++++
-wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat) {
+wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, output) {
   # set seed
   set.seed(seed)
   #......................

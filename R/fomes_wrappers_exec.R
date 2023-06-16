@@ -266,20 +266,20 @@ saveRDS(biasout, file = biasoutput)
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
+theseseeds <- fomesseeds[1:nrow(runmaestro)]
 # mk tbl
-runmaestro <- tibble::tibble(
+runmaestro <- tidyr::expand_grid(
+  seed = theseseeds,
   mod = mod,
   beta = betaI,
   durI = durationI,
   val = val,
-  reps = reps,
+  reps = 1:reps,
   conmat = list(conmat),
   output = output)
 # get seends
-theseseeds <- fomesseeds[1:nrow(runmaestro)]
 # run
 runmaestro <- runmaestro %>%
-  dplyr::mutate(seed = theseseeds) %>%
   dplyr::relocate(seed) %>%
   dplyr::mutate(fomesout = purrr::pmap(., wrap_sim_fomes))
 # tidy up

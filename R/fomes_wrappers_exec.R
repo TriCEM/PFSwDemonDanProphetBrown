@@ -231,7 +231,8 @@ durationI <- simguide$durationI
 mod <- simguide$network_manip
 val <- simguide$val
 netgraph <- simguide$network[[1]]
-conmat <- igraph::as_adjacency_matrix(netgraph, sparse = T)
+conmat <- ifelse(is.null(netgraph), NULL,
+                  igraph::as_adjacency_matrix(netgraph, sparse = T))
 reps <- opt$reps
 output <- opt$output
 
@@ -265,9 +266,9 @@ saveRDS(biasout, file = biasoutput)
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
-Start <- Sys.time()
 # mk tbl
 runmaestro <- tibble::tibble(
+  mod = mod,
   beta = betaI,
   durI = durationI,
   val = val,
@@ -281,11 +282,10 @@ runmaestro <- runmaestro %>%
   dplyr::mutate(seed = theseseeds) %>%
   dplyr::relocate(seed) %>%
   dplyr::mutate(fomesout = purrr::pmap(., wrap_sim_fomes))
-Sys.time() - Start
 # tidy up
 runmaestro <- runmaestro %>%
   dplyr::mutate(net = opt$netpath) %>%
-  dplyr::select(c("seed", "beta", "durI", "mod", "val", "net", "fomesout"))
+  dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val", "net", "fomesout"))
 
 
 saveRDS(runmaestro,

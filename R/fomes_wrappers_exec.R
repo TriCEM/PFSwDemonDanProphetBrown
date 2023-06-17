@@ -57,16 +57,13 @@ library(magrittr)
 wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, output) {
   # set seed
   set.seed(seed)
-  #......................
-  # setup (const, storage, etc)
-  #......................
-  N <- nrow(conmat)
-  beta <- rep(beta, N)
 
   #......................
   # core
   #......................
   if (mod == "NE") {
+    N <- nrow(conmat)
+    beta <- rep(beta, N)
     ret <- fomes::sim_Gillespie_nSIR(Iseed = 1,
                                      N = N,
                                      beta = beta,
@@ -91,6 +88,8 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, output) {
 
 
   } else {
+    N <- nrow(conmat)
+    beta <- rep(beta, N)
     ret <- fomes::sim_Gillespie_nSIR(Iseed = 1,
                                      N = N,
                                      beta = beta,
@@ -231,8 +230,11 @@ durationI <- simguide$durationI
 mod <- simguide$network_manip
 val <- simguide$val
 netgraph <- simguide$network[[1]]
-conmat <- ifelse(is.null(netgraph), NULL,
-                  igraph::as_adjacency_matrix(netgraph, sparse = T))
+if (is.null(netgraph)) {
+  conmat <- NULL
+} else {
+  conmat <-  igraph::as_adjacency_matrix(netgraph, sparse = T)
+}
 reps <- opt$reps
 output <- opt$output
 
@@ -266,10 +268,8 @@ saveRDS(biasout, file = biasoutput)
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####
 #++++++++++++++++++++++++++++++++++++++++++
-theseseeds <- fomesseeds[1:nrow(runmaestro)]
 # mk tbl
 runmaestro <- tidyr::expand_grid(
-  seed = theseseeds,
   mod = mod,
   beta = betaI,
   durI = durationI,
@@ -278,8 +278,10 @@ runmaestro <- tidyr::expand_grid(
   conmat = list(conmat),
   output = output)
 # get seends
+theseseeds <- fomesseeds[1:nrow(runmaestro)]
 # run
 runmaestro <- runmaestro %>%
+  dplyr::mutate(seed = theseseeds) %>%
   dplyr::relocate(seed) %>%
   dplyr::mutate(fomesout = purrr::pmap(., wrap_sim_fomes))
 # tidy up

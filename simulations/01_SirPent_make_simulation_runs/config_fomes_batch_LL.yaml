@@ -1,5 +1,5 @@
 # configuration for simulation runs
 
 rroot:  /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/
-simmap: /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/simulations/00_snakeinput_map_test.tsv
+simmap: /proj/emchlab/users/NickB/Projects/PFSwDemonDanProphetBrown/simulations/00_snakeinput_map.tsv
 outdir: /work/users/n/f/nfb/Projects/PFSwDemonDanProphetBrown/simulations/01_generated_simulation_runs/

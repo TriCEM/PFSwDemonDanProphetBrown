@@ -54,7 +54,7 @@ library(magrittr)
 #++++++++++++++++++++++++++++++++++++++++++
 #### Fomes Wrapper Function        #####
 #++++++++++++++++++++++++++++++++++++++++++
-wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, output) {
+wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, netpath, output) {
   # set seed
   set.seed(seed)
 
@@ -117,7 +117,7 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, output) {
 #' @returns
 #' @export
 
-sim_observation_bias <- function(mod, beta, durI, val, reps, conmat,
+sim_observation_bias <- function(mod, beta, durI, val, reps, conmat, netpath,
                                  bias = c(0.01, 0.05, 0.1)) {
   #............................................................
   # checks
@@ -230,6 +230,7 @@ durationI <- simguide$durationI
 mod <- simguide$network_manip
 val <- simguide$val
 netgraph <- simguide$network[[1]]
+netpath <- simguide$path
 if (is.null(netgraph)) {
   conmat <- NULL
 } else {
@@ -257,6 +258,7 @@ biasout <- sim_observation_bias(
   val = val,
   reps = reps,
   conmat = conmat,
+  netpath = netpath,
   bias = c(0.01, 0.05, 0.1))
 # adjust ouput
 biasoutput <- output
@@ -276,6 +278,7 @@ runmaestro <- tidyr::expand_grid(
   val = val,
   reps = 1:reps,
   conmat = list(conmat),
+  netpath = netpath,
   output = output)
 # get seends
 theseseeds <- fomesseeds[1:nrow(runmaestro)]
@@ -286,8 +289,7 @@ runmaestro <- runmaestro %>%
   dplyr::mutate(fomesout = purrr::pmap(., wrap_sim_fomes))
 # tidy up
 runmaestro <- runmaestro %>%
-  dplyr::mutate(net = opt$netpath) %>%
-  dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val", "net", "fomesout"))
+  dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val", "netpath", "fomesout"))
 
 
 saveRDS(runmaestro,

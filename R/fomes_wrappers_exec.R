@@ -103,7 +103,8 @@ wrap_sim_fomes <- function(seed, mod, beta, durI, val, reps, conmat, netpath, ou
   #......................
   # out
   #......................
-  return(ret)
+  retsumm <- summary(ret)
+  return(retsumm)
 }
 
 

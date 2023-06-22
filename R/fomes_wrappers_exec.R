@@ -178,12 +178,14 @@ sim_observation_bias <- function(mod, beta, durI, val, reps, conmat, netpath,
     dplyr::mutate(seed = seeds) %>%
     dplyr::left_join(., biasedconmat, by = "bias")
   # not wrap_fomes doesn't have bias
-  simmap$biasfinalsize <- purrr::pmap(simmap[, c("seed", "mod", "beta",
+  simmap$biasfomesout <- purrr::pmap(simmap[, c("seed", "mod", "beta",
                                                  "durI", "val", "reps", "conmat")],
                                       wrap_sim_fomes)
   #............................................................
   # out
   #............................................................
+  simmap <- simmap %>%
+    dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val", 'bias', "biasfomesout"))
   return(simmap)
 }
 

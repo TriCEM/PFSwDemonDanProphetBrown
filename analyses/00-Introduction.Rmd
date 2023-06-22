@@ -1,10 +1,4 @@
 ---
-title: "Introduction"
-output: html_document
-date: "2023-05-18"
----
-
----
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -12,4 +6,81 @@ editor_options:
 
 # Introduction
 This document explores various questions proposed by GCP5 in their original hypothesis-generating
-[Gdoc](https://docs.google.com/document/d/1FzXDDyk9h-pWg3O_epDkDZFXIX0Auyk_klfA0C8Ctdk/edit?usp=sharing). Sections are back-ended by various simulation runs that can be found in the `simulations` directory. 
+[Gdoc](https://docs.google.com/document/d/1FzXDDyk9h-pWg3O_epDkDZFXIX0Auyk_klfA0C8Ctdk/edit?usp=sharing). Briefly, our primary objective was to identify methods that disrupt and/or enhance the predictability of infectious disease dynamics (IDD) of emerging outbreaks. We specifically focused on the variation in final sizes (total number of infected individuals) due to differences in contact networks^[We plan to extend our framework as incidence over time versus focusing solely on the epidemic final size]. Our focus on contact networks is based on the assumption that transmission parameters can be readily measured early in an epidemic. As a result, while contact patterns are difficult to measure, they are the pragmatic force driving uncertainty in the predictions of outbreak sizes. 
+
+## Central Questions
+1. How inherently predictable are final sizes on different types of dynamic networks?  
+2. Do we need high-fidelity models of contact network dynamics?  
+3. How does predictability change over different space/time scales?^[Multilayer networks are not yet implemented, limiting this questions]  
+4. How much do final sizes vary across outbreaks of the same pathogen?^[Maddy's work, not presented here]
+
+\br  
+\br  
+\br  
+
+## Project Approach
+1. We first built an IDD simulation model: event-driven stochastic-network SIR model using the Gillespie Algorithm. 
+    + Specifically, the transmission is modeled as: 
+$$
+Rate_{transmission} = (q_{0:n} * 1^T) \cdot \textbf{C} \cdot (I_{0:n} \otimes S_{0:n})
+$$
+where $\textbf{C}$ is a (sparse) symmetric contact matrix and consists of $c_{ij}$ contacts between individuals $ij$. Probability of infection given contact can vary between pairs through the $q$ vector. 
+
+
+    + Similarly, the rate of recovery is modeled as: 
+$$
+Rate_{recovery} = \frac{1}{D_{illness}}
+$$
+where $D_{illness}$ is the duration of illness 
+
+    + While network dynamicity is modeled through a [neighbor exchange](https://pubmed.ncbi.nlm.nih.gov/17878137/) framework as: 
+$$
+Rate_{NE} = \rho
+$$
+where $\rho$ is determined by the user. 
+
+    + This model is containerized as an R-Package: [fomes](https://github.com/TriCEM/fomes)
+      + Additional features within `fomes` include: 
+        + Discrete-Case Discrete-Time SIR Model 
+        + Traditional Gillespie SIR Model (Mass Action)
+        + Implementation of Newman's degree distribution probability generating functions for final size prediction  
+        + Option of Tau-leaping for faster (but less accurate) stochastic simulation
+        
+\br 
+\br 
+
+2. Use `fomes` to evaluate variation in final sizes generated through simulating networks with various features as outlined here in [code](https://github.com/TriCEM/PFSwDemonDanProphetBrown/blob/main/simulations/00_simulation_input_setup.R). 
+
+    + First, we generated 10 "base" networks using the `igraph::degree.sequence.game`, with each node having 20 edges:  
+    + We then manipulated our respective base networks based on the following network features, with network manipulation algorithms detailed [here](https://github.com/TriCEM/PFSwDemonDanProphetBrown/blob/main/R/network_manipulations.R): 
+      + Degree Distribution^[Manipulated using a _"stick-breaking"_ process from the $\beta$ distribution]
+        + DD Probability: 0.05, 0.1, 0.15, 0.2, 0.25
+        + DD Variance: 0, 1, 5, 10, 5 
+      + Modularity/Unity^[Modularity was considered through dropping edges, while "unity" was considered through adding edges. Edges were dropped or added based on _edge betweeness_ measures] 
+        + Edges Dropped or Added: 5, 10, 15, 25, 50, 100, 250, 500, 750, 1000
+      + Clustering^[Triangles were identified through the cross product of the adjacency matrix (i.e. with itself), which identifies common neighbors. Edges were then added or removed accordingly. _N.B._, transitivity values are an approximation, as we used a heuristic-greedy approach.]
+        + Transitivity Values: 0.010, 0.050, 0.075, 0.100, 0.125, 0.150, 0.175, 0.200, 0.225, 0.250
+      + Dynamicity^[From the `fomes` model, using Volz & Meyer's [neighbor exchange](https://pubmed.ncbi.nlm.nih.gov/17878137/) approach] 
+        + $\rho$: 1e-09, 1e-08, 1e-07, 1e-06, 1e-05, 1e-04, 1e-03, 1e-02, 1e-01, 1
+    + Simulations were run with 100 repetitions across 1,000 individuals with probability of infection ranging from: 0.005, 0.01, 0.05, 0.075, 0.1 and duration of illness ranging from 3, 6, 9, 12, 15 days. **Below is a conceptual diagram summarizing this approach**:
+<p align="center">
+<img src="https://raw.githubusercontent.com/TriCEM/PFSwDemonDanProphetBrown/master/R_ignore/conceptual_figs/simconceptruns.jpg" width="700" height="300">
+</p>
+
+    + Simulate results can then be used to:
+      + Compare simulated final size results with Newman's dd-PGF analytical solution/predictions
+      + Determine the amount of bias that can be introduced a network before final sizes are affected
+        + Bias was introduced at 0.01, 0.05, 0.1^[Bias was implemented by selecting the $E*bias = x$ number of edges and randomly flipping the connection: same, different in order to perserve overall degree distribution]
+      + Additional features:
+        + We also have an adaptive simulated annealing strategy to find the "phase transitions" in the epidemic if a specific network topology becomes of interest: [code](https://github.com/TriCEM/PFSwDemonDanProphetBrown/blob/main/R/fomes_wrappers_simulated_annealing_search_exec.R)
+
+\br 
+\br 
+
+3. Build a "prophet" model: a forward convolutional neural network^[As stated above, we plan to update this to a recurrence CNN or a long-short term memory CNN to evaluate incidence] to predict final sizes based on a given contact matrix. In order to challenge our _prophet_, we will make a _demon_ variational autoencoder that produces adjacency networks with complicated network features, and not just those limited to standard random graphs, etc. Finally, we have implemented a _Faustian_ Reinforcement Learning approach that uses Deep Q-Learning to balance the _prophet_ and _demon_ training. This RL approach helps to overcome the stochasticity introduced by the `fomes` simulations from the same initial contact matrix, which largely washes out the gradients during typical backward propagation.  
+
+    + Using the simulations above, train our _prophet_ and _demon_. 
+    + Run `faustRL` and optimize additional _prophet_ training (with the demon becoming more clever at thwarting the prophet)
+      + Compare _prophet_ predictions to Newman's dd-PGF analytical solutions
+
+

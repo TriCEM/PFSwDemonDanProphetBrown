@@ -1,0 +1,234 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, eval = T, results = 'hide',
+                      fig.align = 'center', fig.width = 8, fig.height = 8)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r}
+library(tidyverse)
+library(ggridges)
+library(DT)
+library(fomes)
+source("R/themes.R")
+```
+
+# Section I: Using Fomes to Investigate Low-Hanging Fruit 
+
+In this section we will use the basic functionality of `fomes` to investigate "low-hanging" fruit questions. 
+
+## Running `fomes`
+```{r}
+# network
+N <- 1e2
+init_contact_mat <- igraph::as_adjacency_matrix(
+  igraph::degree.sequence.game(
+    out.deg = rep(floor(0.25*N), N), method = "vl"
+  ), sparse = F)
+
+# run of reg model
+set.seed(48)
+regout <- fomes::sim_Gillespie_nSIR(Iseed = 1, N = N,
+                          beta = rep(0.025, N),
+                          dur_I = 5,
+                          rho = 1e-27, # low rewiring rate
+                          init_contact_mat = init_contact_mat,
+                          term_time = 50,
+                          return_contact_matrices = F)
+regoutdf <- summary(regout)
+
+# run tau leap model 
+tauout <- fomes::sim_tauGillespie_nSIR(Iseed = 1, N = N,
+                          beta = rep(0.025, N),
+                          dur_I = 5,
+                          rho = 1e-27, # low rewiring rate
+                          tau = 1,
+                          init_contact_mat = init_contact_mat,
+                          term_time = 50,
+                          return_contact_matrices = F)
+taudfcurve <- tibble::tibble(
+  Time = tauout$Time_traj,
+  Event = "",
+  Susc = sapply(tauout$S_traj, sum),
+  Infxn = sapply(tauout$I_traj, sum),
+  Recov = sapply(tauout$R_traj, sum),
+  mod = "Tau-Leaping"
+)
+
+#......................
+# plot together
+#......................
+regoutdf$CumEvents %>% 
+  dplyr::mutate(mod = "Trad.") %>% 
+  dplyr::bind_rows(., taudfcurve) %>%
+  tidyr::pivot_longer(., cols = c("Susc", "Infxn", "Recov"), 
+                      names_to = "sir", values_to = "cnt") %>% 
+  dplyr::mutate(sir = factor(sir, levels = c("Susc", "Infxn", "Recov"), ordered = T),
+                mod = factor(mod, levels = c("Trad.", "Tau-Leaping"), ordered = T)) %>% 
+  ggplot() + 
+  geom_line(aes(x = Time, y = cnt, color = sir)) + 
+  facet_grid(cols = vars(mod)) +
+  scale_color_viridis_d("Curve") + 
+  ggtitle("Traditional Gillespie vs Tau-Leaping Approximation",
+          subtitle = "Note the smoother, larger jumps in the Tau-Leaping Approx.") + 
+  xlab("Time") + ylab("Count") + 
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, vjust = 0.5, size = 14),
+                    axis.title = element_text(face = "bold", hjust = 0.5, vjust = 0.5, size = 12),
+                    axis.text = element_text(hjust = 0.5, size = 11),
+                    legend.position = "right",
+                    legend.title = element_text(face = "bold", vjust = 0.85, size = 12),
+                    legend.text = element_text(hjust = 0.5, vjust = 0.5, size = 10),
+                    axis.line = element_line(color = "#000000", size = 1))
+
+```
+
+
+## Differentiating Mass Action and Degree Distribution
+Here, we can compare our simulated degree distribution results versus the mass action model results to approximate the point of divergence using the KL divergence formula. We can then contrast this with Newman's equation predictions. This is a precursor to our large question: _"How does the variance in the final size distribution change as we vary properties of the network?"_
+
+
+```{r}
+#............................................................
+# read in results
+#...........................................................
+maret <- readRDS("analyses/zbackend-low_hang_fruit/mass_action_divergence.RDS")
+nettabs <- maret$nettabs %>% 
+  dplyr::select(c("fs", "dd")) %>% 
+  dplyr::mutate(mod = "DDNetwork")
+matab <- maret$matab %>% 
+  dplyr::select("fs") %>% 
+  dplyr::mutate(dd = 100,
+                mod = "MassAction")
+
+#......................
+# plot ridges
+#......................
+dplyr::bind_rows(nettabs, matab) %>% 
+  dplyr::mutate(ddfact = factor(dd, levels = 1:100, ordered = T)) %>% 
+  ggplot() +
+  ggridges::geom_density_ridges2(aes(x = fs, y = ddfact, fill = mod)) +
+  scale_fill_viridis_d("Sim. Mod") + 
+  xlab("Final Size Variation") + 
+  ylab("Number of Edges per Node") +
+  ggtitle("Comparing Mass Action versus Network SIR Gillespie") + 
+  plot_theme
+
+#......................
+# plot
+#......................
+cheapKL <- function(fs1, fs2) {
+  d1 <- as.data.frame(table(fs1), stringsAsFactors = F) %>%
+    magrittr::set_colnames(c("fs", "Freq"))
+  d2 <- as.data.frame(table(fs2), stringsAsFactors = F) %>%
+    magrittr::set_colnames(c("fs", "Freq"))
+  difftab <- dplyr::full_join(d1, d2, by = "fs") %>%
+    dplyr::mutate(fs = as.numeric(fs)) %>%
+    dplyr::arrange(fs)
+  # do cheap KL
+  p <- difftab$Freq.x
+  q <- difftab$Freq.y
+  kl_div <- sum(p * log(p / q, base = exp(1)), na.rm = T) # NB, slightly conflating b/c tolerance for 0s
+  return(kl_div)
+}
+nettabfs <- split(nettabs$fs, factor(nettabs$dd))
+KL <- mapply(cheapKL, fs1 = list(matab$fs), fs2 = nettabfs, SIMPLIFY = T)
+tibble::tibble(edges = names(nettabfs), KL = round(KL,2)) %>% 
+  DT::datatable(.,
+                rownames = F,
+                caption = 'Cheap KL Divergence between Mass Action and Network Simulations',
+                options = list(autoWidth = TRUE))
+```
+
+
+## Mass Action vs Dynamicity 
+For modeling dynamicity of contacts, we used the neighbor exchange method presented by [Volz and Meyer 2007](https://pubmed.ncbi.nlm.nih.gov/17878137/). In their subsequent manuscript, [Volz and Meyer 2009](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2659580/) show that once can solve the NE model in a closed form approximation and predict final sizes. They state that the NE converges to a mass action model as the mixing rate has $\lim_{\rho \rightarrow \infty}$ (paragraph above discussion). Here, we will explore that result and the _intrinsic variability in final sizes changes as we go from a full static network (small rho) to a random mixing model (large rho=1)"_.  
+
+```{r}
+#......................
+# get NE results
+#......................
+rhotabs <- maret$rhotabs %>% 
+  dplyr::select(c("fs", "rho")) %>% 
+  dplyr::mutate(rho = as.character(rho),
+                mod = "RhoNetwork")
+matab <- maret$matab %>% 
+  dplyr::select("fs") %>% 
+  dplyr::mutate(rho = "Inf",
+                mod = "MassAction")
+
+#......................
+# plot ridges
+#......................
+rholvls <- c(paste(sapply(c(5,3,0,-3,-5), function(x){10^(-x)})), "Inf")
+dplyr::bind_rows(rhotabs, matab) %>% 
+  dplyr::mutate(rhofact = factor(rho, levels = rholvls, ordered = T)) %>% 
+  ggplot() +
+  ggridges::geom_density_ridges2(aes(x = fs, y = rhofact, fill = mod)) +
+  scale_fill_viridis_d("Sim. Mod") + 
+  xlab("Final Size Variation") + 
+  ylab("Neighbor Exchange Rate") +
+  ggtitle("Comparing Mass Action versus Dynamic Network SIR Gillespie") + 
+  plot_theme
+
+
+```
+
+
+## Newman PGF
+In the seminal paper, [Spread of epidemic disease on networks](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.66.016128), Newman used the bond-percolation framework to predict final sizes of epidemics based on the degree distribution. Here, we use an Erdos-Renyi graph at varying levels of tranmissibility as compared with our `fomes` continous Gillespie SIR model and the discrete-case discrete-time model. 
+
+```{r}
+#............................................................
+# read results
+#...........................................................
+N <- 1e3
+pgrid <- readRDS("analyses/zbackend-low_hang_fruit/NewmanBioProof.RDS")
+
+#......................
+# tidy and viz
+#......................
+pgrid_viz <- pgrid %>%
+  dplyr::mutate(
+    meanfomesCT = purrr::map_dbl(fomesCT, mean),
+    varfomesCT = purrr::map_dbl(fomesCT, var),
+    meanfomesDT = purrr::map_dbl(fomesDT, mean),
+    varfomesDT = purrr::map_dbl(fomesDT, var),
+    fracmeanfomesCT = meanfomesCT/N,
+    fracmeanfomesDT = meanfomesDT/N,
+    fracvarfomesCT = varfomesCT/N,
+    fracvarfomesDT = varfomesDT/N,
+  ) %>%
+  dplyr::select(-c("conmat", "graph", "fomesCT", "fomesDT"))
+
+#......................
+# plot
+#......................
+pgrid_viz %>%
+  tidyr::pivot_longer(., cols = c("fracmeanfomesDT", "fracmeanfomesCT"),
+                      values_to = "fs", names_to = "mod") %>%
+  dplyr::mutate(mod = factor(mod, levels = c("fracmeanfomesDT", "fracmeanfomesCT"),
+                             labels = c("Cont.", "Disc.")),
+                fsvar = ifelse(mod == "fracmeanfomesDT", fracvarfomesDT, fracvarfomesCT)) %>%
+  ggplot() +
+  geom_point(aes(x = newmanIntegral, y = fs,
+                 color = fsvar, shape = mod)) +
+  scale_color_viridis_c("Variation in Final Sizes") +
+  scale_shape_manual("Model Type", values = c(1,4)) +
+  theme_linedraw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Newman Final Size Analytic Est.") +
+  ylab("fomes Simulated Final Size") + 
+  geom_abline(slope = 1, intercept = 0, alpha = 0.5, linetype = "dashed") +
+  plot_theme
+
+
+
+```
+
+_N.B._, our results appear to reflect the finding that Newman's analytical equations underestimate the final epidemic size due to his assumption of a constant infectious period as described by [Kenah & Robins 2008](https://pubmed.ncbi.nlm.nih.gov/17930312/).^[The methods described by Kenah & Robins 2008 are not yet implemented in `fomes`]

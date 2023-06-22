@@ -42,21 +42,6 @@ betaI <- c(0.005, 0.01, 0.05, 0.075, 0.1)
 durationI <- seq(3, 15, by = 3)
 sirparams <- tidyr::expand_grid(betaI = betaI,
                                 durationI = durationI)
-#..........
-# make Mass Action Model
-#..........
-outdir <- "simulations/00_snakeinput_networks/mass_action_network/"
-dir.create(outdir, recursive = T)
-maoupath <- paste0(outdir, "massactionnetwork.RDS")
-manet <- matrix(data = 1, nrow = N, ncol = N)
-diag(manet) <- 0
-manet <- igraph::graph_from_adjacency_matrix(manet)
-saveRDS(manet, file = maoupath)
-massactiondf <- tibble::tibble(
-  network_manip = "massaction",
-  param = "ma",
-  val = as.character(0),
-  path = maoupath)
 
 #......................
 # STEP 1: generate 10 base networks
@@ -280,8 +265,7 @@ maestro_dfNEdyn <- tidyr::expand_grid(basenetpaths, nexchange_rate) %>%
 ### Bring Together       ####
 #++++++++++++++++++++++++++++++++++++++++++
 # combine network rows
-maestro <- dplyr::bind_rows(massactiondf,
-                            maestro_dfbase,
+maestro <- dplyr::bind_rows(maestro_dfbase,
                             maestro_dfdegdist,
                             maestro_dfmodularity,
                             maestro_dfunity,

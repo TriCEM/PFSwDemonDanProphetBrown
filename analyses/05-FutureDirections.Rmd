@@ -1,0 +1,19 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Ongoing Concerns
+
+## Future Considerations
+The team will investigate whether network summary statistics can produce similarly accurate predictions.
+Dynamicity more 
+implement fs from 
+[Kenah & Robins 2008](https://pubmed.ncbi.nlm.nih.gov/17930312/)
+
+Volz & Meyers do solve their NE model
+
+
+
+

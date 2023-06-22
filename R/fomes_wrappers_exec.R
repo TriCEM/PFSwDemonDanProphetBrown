@@ -179,13 +179,14 @@ sim_observation_bias <- function(mod, beta, durI, val, reps, conmat, netpath,
     dplyr::left_join(., biasedconmat, by = "bias")
   # not wrap_fomes doesn't have bias
   simmap$biasfomesout <- purrr::pmap(simmap[, c("seed", "mod", "beta",
-                                                 "durI", "val", "reps", "conmat")],
-                                      wrap_sim_fomes)
+                                                "durI", "val", "reps", "conmat")],
+                                     wrap_sim_fomes)
   #............................................................
   # out
   #............................................................
   simmap <- simmap %>%
-    dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val", 'bias', "biasfomesout"))
+    dplyr::select(c("seed", "mod", "beta", "durI", "mod", "val",
+                    "netpath", "bias", "biasfomesout"))
   return(simmap)
 }
 
@@ -253,22 +254,24 @@ fomesseeds <- sample(1:reps*1e2, size = reps, replace = F)
 #++++++++++++++++++++++++++++++++++++++++++
 ### Observation Bias ####
 #++++++++++++++++++++++++++++++++++++++++++
-# run
-biasout <- sim_observation_bias(
-  mod = mod,
-  beta = betaI,
-  durI = durationI,
-  val = val,
-  reps = reps,
-  conmat = conmat,
-  netpath = netpath,
-  bias = c(0.01, 0.05, 0.1))
-# adjust ouput
-biasoutput <- output
-biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
-# save
-saveRDS(biasout, file = biasoutput)
 
+if (!(mod %in% c("massaction", "base"))) { # ignoring bias on base or MA
+  # run
+  biasout <- sim_observation_bias(
+    mod = mod,
+    beta = betaI,
+    durI = durationI,
+    val = val,
+    reps = reps,
+    conmat = conmat,
+    netpath = netpath,
+    bias = c(0.01, 0.05, 0.1))
+  # adjust ouput
+  biasoutput <- output
+  biasoutput <- stringr::str_replace(biasoutput, ".RDS", "-BIAStesting.RDS")
+  # save
+  saveRDS(biasout, file = biasoutput)
+}
 
 #++++++++++++++++++++++++++++++++++++++++++
 ### Run What you Brung Main ####

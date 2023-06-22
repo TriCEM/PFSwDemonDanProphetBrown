@@ -10,8 +10,8 @@ import sys
 from snakemake.utils import read_job_properties
 
 # adjust time and mem PRN
-DEFAULT_PROPERTIES = {	"threads": ("1", "-n {threads}"), "time": ("12:00:00", "-t {time}"),
-			"memory": (16, "--mem={memory}g"), "log_dir": ("jobs/job%j.out", "-o {log_dir}"),
+DEFAULT_PROPERTIES = {	"threads": ("1", "-n {threads}"), "time": ("24:00:00", "-t {time}"),
+			"memory": (8, "--mem={memory}g"), "log_dir": ("jobs/job%j.out", "-o {log_dir}"),
 			"err_dir": ("jobs/job%j.err", "-e {err_dir}") }
 
 os.system("mkdir -p jobs")

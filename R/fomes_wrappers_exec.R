@@ -174,7 +174,7 @@ sim_observation_bias <- function(mod, beta, durI, val, reps, conmat, netpath,
   # expand out simmap
   #......................
   reps <- 1:reps
-  simmap <- tidyr::expand_grid(mod, val, reps, beta, durI, bias) %>%
+  simmap <- tidyr::expand_grid(mod, val, reps, beta, durI, bias, netpath) %>%
     dplyr::mutate(seed = seeds) %>%
     dplyr::left_join(., biasedconmat, by = "bias")
   # not wrap_fomes doesn't have bias

@@ -38,3 +38,5 @@ simulations/01_generated_simulation_runs/
 .Renviron
 
 simulations/OLD-01_generated_simulation_runs/
+
+analyses/zbackend-large_simulation_sirpent_runs/nohup.out

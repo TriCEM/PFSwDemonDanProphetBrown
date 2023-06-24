@@ -13,7 +13,7 @@ library(igraph)
 #............................................................
 # read in my Nets
 #...........................................................
-snin <- list.files("simulations/00_snakeinput_data/", full.names = T)
+snin <- list.files(paste0(here::here(), "/simulations/00_snakeinput_data/"), full.names = T)
 snin <- lapply(snin, readRDS) %>%
   dplyr::bind_rows()
 
@@ -34,12 +34,14 @@ integralget_newman_mean_final_epidemic_size <- function(network, durationI, beta
 # Run Newman Approx
 #...........................................................
 sninout <- snin %>%
-  dplyr::mutate(NewmanApprox = purrr::pmap_dbl(., integralget_newman_mean_final_epidemic_size))
+  dplyr::mutate(NewmanApprox = purrr::pmap_dbl(., integralget_newman_mean_final_epidemic_size, .progress = T))
 
 #............................................................
 # out
 #...........................................................
-sninout %>%
-  dplyr::mutate(dplyr::mutate(basenet = stringr::str_extract(basename(unique(ret$netpath)), "(?<=_)[0-9]+(?=\\.RDS$)"))) %>%
-  dplyr::select(-c("param", "path", "network")) %>%
-  saveRDS(., file = "analyses/zbackend-large_simulation_sirpent_runs/newman_approximation_from_inputs.RDS")
+out <- sninout %>%
+  dplyr::mutate(basenet = purrr::map_chr(path, function(x){stringr::str_extract(basename(unique(x)), "(?<=_)[0-9]+(?=\\.RDS$)")})) %>%
+  dplyr::select(-c("param", "path", "network"))
+saveRDS(out, paste0(here::here(),
+                    "/analyses/zbackend-large_simulation_sirpent_runs/newman_approximation_from_inputs.RDS"))
+

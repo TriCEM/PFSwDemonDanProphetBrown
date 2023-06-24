@@ -4,16 +4,19 @@ editor_options:
   chunk_output_type: console
 ---
 
+# Future Work & Directions
+
 ## Ongoing Concerns
-
+ + Tau leaping while faster has an issue w/ running out connected nodes to infect (i.e. if you draw 14 infections, but you have only a single infected node that has 10 connections, you are forced to do sampling w/ replacement, which will negatively bias the epidemic size)
+ + Gumbell-Softmax Demon VAE producing networks that have very limited edge densities (i.e. some cases only 1 edge?)
+ + VAE does not respect symmetry in the adjacency matrix, in the case of undirected links. Should we be training half of the image? 
+        
 ## Future Considerations
-The team will investigate whether network summary statistics can produce similarly accurate predictions.
-Dynamicity more 
-implement fs from 
-[Kenah & Robins 2008](https://pubmed.ncbi.nlm.nih.gov/17930312/)
-
-Volz & Meyers do solve their NE model
-
+ + Are final sizes the correct metric?
+    + Implement long-short term memory FCNN or RNN CNN prophet model for "forecasting" (i.e. incidence predictions)
+ + Implementation of final size predictions w/ Newman's constant duration of infection fixed: [Kenah & Robins 2008](https://pubmed.ncbi.nlm.nih.gov/17930312/)
+ + Implentation of [Volz & Meyers 2008](https://pubmed.ncbi.nlm.nih.gov/18664429/) final size prediction under the neighbor-exchange model 
+        
 
 
 

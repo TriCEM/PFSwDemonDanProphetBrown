@@ -1,0 +1,178 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, eval = T, results = 'hide',
+                      fig.align = 'center', fig.width = 8, fig.height = 8)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r}
+library(fomes)
+library(tidyverse)
+library(DT)
+source("R/KLdiverg.R")
+source("R/themes.R")
+```
+
+```{r}
+#............................................................
+# read in and extract relevant information from simulations
+#...........................................................
+fns <- list.files("simulations/01_generated_simulation_runs/", recursive = T, pattern = ".RDS", full.names = T)
+fns <- fns[stringr::str_detect(fns, "log", negate = T)] # drops logs
+# need bias
+biasfns <- fns[stringr::str_detect(fns, "BIAS", negate = F)]
+# need OG as well
+ogfns <- fns[stringr::str_detect(fns, "BIAS", negate = T)]
+
+
+```
+
+# Divergence with Observation Bias Introduced
+In this section, we have introduced "observation bias" into our networks at the following levels: 1%, 5%, 10%. Observation bias was created by randomly selecting the x% edges (and potential edges) previously described and randomly erasing or adding them. This section aims to answer the question: _"How much observation bias can be introduced into a network before the variance in the final size distribution noticeably changes?")_. 
+
+```{r}
+#............................................................
+# og fxn
+#...........................................................
+#............................................................
+# extract relevant information
+#...........................................................
+# each OG RDS is a 100 indiviudal reps/realizations of a fomes model given a beta and durI w/r/t a netpath and val of that netpath 
+OGextractfs <- function(pth) {
+  ret <- readRDS(pth)
+  ret %>% 
+    dplyr::mutate(basenet = stringr::str_extract(basename(unique(ret$netpath)), "(?<=_)[0-9]+(?=\\.RDS$)")) %>% 
+    dplyr::mutate(fs = purrr::map_dbl(fomesout, "FinalEpidemicSize")) %>%  
+    dplyr::select(-c("seed", "fomesout")) %>% 
+    dplyr::group_by(mod, beta, durI, val, basenet) %>% 
+    tidyr::nest(finalsizes = fs)
+}
+#......................
+# make results tbl
+#......................
+ogsimrets <- lapply(ogfns, OGextractfs) %>% 
+  dplyr::bind_rows()
+
+#............................................................
+# bias fxm
+#...........................................................
+Biasextractfs <- function(pth) {
+  
+  ret <- readRDS(pth)
+  ret %>% 
+    dplyr::mutate(basenet = stringr::str_extract(basename(unique(ret$netpath)), "(?<=_)[0-9]+(?=\\.RDS$)")) %>% 
+    dplyr::mutate(biasfs = purrr::map_dbl(biasfomesout, "FinalEpidemicSize")) %>%  
+    dplyr::select(-c("seed", "biasfomesout")) %>% 
+    dplyr::group_by(mod, beta, durI, val, basenet, bias) %>% 
+    tidyr::nest(biasfinalsizes = biasfs)
+}
+
+#......................
+# make results tbl
+#......................
+biassimrets <- lapply(biasfns, Biasextractfs) %>% 
+  dplyr::bind_rows()
+
+```
+
+```{r}
+#............................................................
+# make generalizable plot function
+#...........................................................
+plotBiasSimRet <- function(df, modname) {
+  #......................
+  # capture our subset conditions   
+  #......................
+  enqmodname <- rlang::enquo(modname)
+  #......................
+  # subset to plot df  
+  #......................
+  plotdf <- df %>% 
+    dplyr::filter(mod == !!enqmodname) 
+    #dplyr::filter(beta == !!enqbeta) %>% 
+    #dplyr::filter(durI == !!enqdurI)
+  #......................
+  # plotting items that are project specific 
+  #......................
+  # betas and durI 
+  transmvls <- tidyr::expand_grid(betaI = c(0.005, 0.01, 0.05, 0.075, 0.1), durationI = seq(3, 15, by = 3)) %>% 
+    dplyr::mutate(bd = purrr::map2_dbl(betaI, durationI, function(x,y){ 1 - (1-x)^y }),
+                  bd = round(bd,4)) %>% 
+    dplyr::arrange(bd) %>% 
+    dplyr::mutate(bd = as.character(bd)) %>% 
+    dplyr::pull(bd)
+  
+  # lvls
+  if (modname == "degreedist") {
+    mylvls <- tidyr::expand_grid(x = c(0.05, 0.1, 0.15, 0.2, 0.25), y = c(0, 1, 5, 10, 25)) %>%
+      dplyr::mutate(val = purrr::map2_chr(x, y, function(x, y){paste(x, y, sep = "-")})) %>% 
+      dplyr::pull(val)
+  } else {
+    mylvls <- as.character( sort(unique(as.numeric(plotdf$val))) )
+  }
+  
+  # plot
+  plotObj <- plotdf %>% 
+    dplyr::mutate(valfct = factor(val, levels = mylvls, ordered = T),
+                  transmission = 1 - (1-beta)^durI,
+                  transmission = round(transmission, 4),
+                  transmission_fct = factor(transmission, levels = transmvls, ordered = T)) %>% 
+    ggplot() + 
+    geom_boxplot(aes(x = valfct, y = KLdiverg, color = transmission_fct),
+                 outlier.shape = 8,
+                 position = position_dodge(width = 0.6),
+                 alpha = 0.5) +
+    scale_color_viridis_d("Transmission") +
+    plot_theme + 
+    theme(axis.text.x = element_text(hjust = 0.5, vjust = 0.6, size = 11, angle = 45)) +
+    xlab("Net Value Manipulation") + ylab("KL Divergence between Full and Biased Sims") + 
+    labs(caption = "Transmission is a binomial approximation w/r/t prob. of infxn and duration of illness.")
+  plot(plotObj)
+  # plotly
+  #plotly::ggplotly(plotObj)
+}
+
+#............................................................
+# Combine two Results and calculate KL
+#...........................................................
+combrets <- dplyr::left_join(ogsimrets, biassimrets, 
+                             by = c("mod", "beta", "durI", "val", "basenet"))
+
+# wrapper fxn
+KLdivpqcont_wrapper <- function(finalsizes, biasfinalsizes, N) {
+  out <- KLdivpqcont(p_empdat = finalsizes$fs, q_empdat = biasfinalsizes$biasfs, N = N)
+  return( out$integral )
+}
+
+combrets <- combrets %>% 
+  dplyr::mutate(KLdiverg = purrr::map2_dbl(finalsizes, biasfinalsizes, KLdivpqcont_wrapper, 
+                                           N = 1000))
+```
+
+### Degree Distribution
+```{r}
+plotBiasSimRet(df = combrets, modname = "degreedist")
+```
+
+### Modularity
+```{r}
+plotBiasSimRet(df = combrets, modname = "modularity")
+```
+
+### Unity
+```{r}
+plotBiasSimRet(df = combrets, modname = "Unity")
+```
+
+### Clustering
+```{r}
+plotBiasSimRet(df = combrets, modname = "cluster")
+```
+
+### Dynamicity
+```{r}
+plotBiasSimRet(df = combrets, modname = "NEdynamicity")
+```
